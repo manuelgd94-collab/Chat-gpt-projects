@@ -1,0 +1,170 @@
+import type { DayBucket, Filters, KpiSummary, MatrixCell, WorkOrder } from './types';
+import { dayKey, dayLabel, derivePrograma, sameDay } from './derive';
+
+export function applyFilters(rows: WorkOrder[], f: Filters): WorkOrder[] {
+  return rows.filter((r) => {
+    if (f.semana !== 'TODAS' && r.semana !== f.semana) return false;
+    if (f.area !== 'TODAS' && r.area !== f.area) return false;
+    if (f.programa !== 'TODOS' && derivePrograma(r) !== f.programa) return false;
+    if (f.disciplina !== 'TODAS' && r.disciplina !== f.disciplina) return false;
+    return true;
+  });
+}
+
+export function computeKpis(rows: WorkOrder[]): KpiSummary {
+  const planCount = rows.filter((r) => r.inicioProgramado != null).length;
+  const realCount = rows.filter((r) => r.completada).length;
+  const cumplimiento = planCount > 0 ? realCount / planCount : 0;
+
+  const completadas = rows.filter((r) => r.completada);
+  const adherentes = completadas.filter((r) => sameDay(r.inicioPrevisto, r.inicioProgramado)).length;
+  const adherencia = completadas.length > 0 ? adherentes / completadas.length : 0;
+
+  return {
+    planCount,
+    realCount,
+    cumplimiento,
+    adherencia,
+    desviacion: realCount - planCount,
+  };
+}
+
+export function bucketByDay(rows: WorkOrder[]): DayBucket[] {
+  const map = new Map<string, { plan: number; real: number }>();
+
+  for (const r of rows) {
+    const planKey = dayKey(r.inicioProgramado);
+    if (planKey) {
+      const b = map.get(planKey) ?? { plan: 0, real: 0 };
+      b.plan++;
+      map.set(planKey, b);
+    }
+    if (r.completada) {
+      const realKey = dayKey(r.inicioProgramado) ?? dayKey(r.inicioPrevisto);
+      if (realKey) {
+        const b = map.get(realKey) ?? { plan: 0, real: 0 };
+        b.real++;
+        map.set(realKey, b);
+      }
+    }
+  }
+
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dia, v]) => ({ dia, label: dayLabel(dia), plan: v.plan, real: v.real }));
+}
+
+export interface CurvaSPoint {
+  dia: string;
+  label: string;
+  pctPlan: number;
+  pctReal: number;
+}
+
+export function curvaS(buckets: DayBucket[]): CurvaSPoint[] {
+  const totalPlan = buckets.reduce((s, b) => s + b.plan, 0);
+  const totalReal = buckets.reduce((s, b) => s + b.real, 0);
+  const denom = Math.max(totalPlan, 1);
+  let accPlan = 0;
+  let accReal = 0;
+  const out: CurvaSPoint[] = [];
+  for (const b of buckets) {
+    accPlan += b.plan;
+    accReal += b.real;
+    out.push({
+      dia: b.dia,
+      label: b.label,
+      pctPlan: accPlan / denom,
+      pctReal: accReal / denom,
+    });
+  }
+  void totalReal;
+  return out;
+}
+
+export function matrixDisciplinaDia(rows: WorkOrder[]): {
+  disciplinas: string[];
+  dias: { dia: string; label: string }[];
+  cells: Map<string, MatrixCell>;
+} {
+  const disciplinasSet = new Set<string>();
+  const diasSet = new Set<string>();
+  const buckets = new Map<string, { plan: number; real: number }>();
+
+  for (const r of rows) {
+    disciplinasSet.add(r.disciplina);
+    const planKey = dayKey(r.inicioProgramado);
+    if (planKey) {
+      diasSet.add(planKey);
+      const k = `${r.disciplina}__${planKey}`;
+      const b = buckets.get(k) ?? { plan: 0, real: 0 };
+      b.plan++;
+      buckets.set(k, b);
+    }
+    if (r.completada) {
+      const realKey = dayKey(r.inicioProgramado) ?? dayKey(r.inicioPrevisto);
+      if (realKey) {
+        diasSet.add(realKey);
+        const k = `${r.disciplina}__${realKey}`;
+        const b = buckets.get(k) ?? { plan: 0, real: 0 };
+        b.real++;
+        buckets.set(k, b);
+      }
+    }
+  }
+
+  const disciplinas = Array.from(disciplinasSet).sort();
+  const dias = Array.from(diasSet)
+    .sort()
+    .map((d) => ({ dia: d, label: dayLabel(d) }));
+
+  const cells = new Map<string, MatrixCell>();
+  for (const d of disciplinas) {
+    for (const { dia } of dias) {
+      const k = `${d}__${dia}`;
+      const b = buckets.get(k) ?? { plan: 0, real: 0 };
+      const pct = b.plan > 0 ? b.real / b.plan : b.real > 0 ? 1 : 0;
+      cells.set(k, { disciplina: d, dia, plan: b.plan, real: b.real, pct });
+    }
+  }
+  return { disciplinas, dias, cells };
+}
+
+export interface AreaSummaryRow {
+  area: string;
+  plan: number;
+  real: number;
+  cumplimiento: number;
+  adherencia: number;
+}
+
+export function areaSummary(rows: WorkOrder[]): AreaSummaryRow[] {
+  const byArea = new Map<string, WorkOrder[]>();
+  for (const r of rows) {
+    const list = byArea.get(r.area) ?? [];
+    list.push(r);
+    byArea.set(r.area, list);
+  }
+  return Array.from(byArea.entries())
+    .map(([area, list]) => {
+      const k = computeKpis(list);
+      return { area, plan: k.planCount, real: k.realCount, cumplimiento: k.cumplimiento, adherencia: k.adherencia };
+    })
+    .sort((a, b) => b.plan - a.plan);
+}
+
+export function uniqueSemanas(rows: WorkOrder[]): string[] {
+  return Array.from(new Set(rows.map((r) => r.semana).filter((s): s is string => !!s))).sort();
+}
+
+export function uniqueDisciplinas(rows: WorkOrder[]): string[] {
+  return Array.from(new Set(rows.map((r) => r.disciplina))).sort();
+}
+
+export function uniqueProgramas(rows: WorkOrder[]): string[] {
+  return Array.from(new Set(rows.map(derivePrograma))).sort();
+}
+
+export function uniqueAreas(rows: WorkOrder[]): string[] {
+  return Array.from(new Set(rows.map((r) => r.area))).sort();
+}
