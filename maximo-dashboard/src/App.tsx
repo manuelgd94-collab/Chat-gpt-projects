@@ -1,20 +1,22 @@
-import { useMemo, useState } from 'react';
-import { FileUpload } from './components/FileUpload';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FiltersBar } from './components/Filters';
 import { KpiCards } from './components/KpiCards';
 import { PlanVsReal } from './components/PlanVsReal';
 import { CurvaS } from './components/CurvaS';
 import { Matrix } from './components/Matrix';
 import { AreaSummary } from './components/AreaSummary';
-import { parseWorkbook } from './lib/parser';
+import { AdherenciaDiaria } from './components/AdherenciaDiaria';
+import { WeekManager } from './components/WeekManager';
 import {
   applyFilters,
   areaSummary,
   bucketByDay,
   computeKpis,
   curvaS,
+  defaultTargetDate,
   matrixDisciplinaDia,
 } from './lib/kpi';
+import { getWeekOrders, listWeeks, type WeekMeta } from './lib/db';
 import type { Filters, WorkOrder } from './lib/types';
 
 const DEFAULT_FILTERS: Filters = {
@@ -24,30 +26,43 @@ const DEFAULT_FILTERS: Filters = {
   disciplina: 'TODAS',
 };
 
-export default function App() {
-  const [rows, setRows] = useState<WorkOrder[]>([]);
-  const [fileName, setFileName] = useState<string | null>(null);
-  const [sheetName, setSheetName] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+const ACTIVE_WEEK_KEY = 'maximo-dashboard:activeWeek';
 
-  const onFile = async (f: File) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const r = await parseWorkbook(f);
-      setRows(r.rows);
-      setFileName(f.name);
-      setSheetName(r.sheetName);
-      setFilters(DEFAULT_FILTERS);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+export default function App() {
+  const [weeks, setWeeks] = useState<WeekMeta[]>([]);
+  const [activeWeekId, setActiveWeekIdState] = useState<string | null>(() =>
+    localStorage.getItem(ACTIVE_WEEK_KEY),
+  );
+  const [rows, setRows] = useState<WorkOrder[]>([]);
+  const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [diaObjetivo, setDiaObjetivo] = useState<string>(() => defaultTargetDate());
+  const [bumpId, setBumpId] = useState(0);
+
+  const setActiveWeekId = useCallback((id: string | null) => {
+    setActiveWeekIdState(id);
+    if (id) localStorage.setItem(ACTIVE_WEEK_KEY, id);
+    else localStorage.removeItem(ACTIVE_WEEK_KEY);
+  }, []);
+
+  const refresh = useCallback(() => setBumpId((n) => n + 1), []);
+
+  useEffect(() => {
+    listWeeks().then((ws) => {
+      setWeeks(ws);
+      if (ws.length > 0 && (!activeWeekId || !ws.some((w) => w.weekId === activeWeekId))) {
+        setActiveWeekId(ws[ws.length - 1].weekId);
+      }
+      if (ws.length === 0) setActiveWeekId(null);
+    });
+  }, [bumpId, activeWeekId, setActiveWeekId]);
+
+  useEffect(() => {
+    if (!activeWeekId) {
       setRows([]);
-    } finally {
-      setLoading(false);
+      return;
     }
-  };
+    getWeekOrders(activeWeekId).then(setRows);
+  }, [activeWeekId, bumpId]);
 
   const filtered = useMemo(() => applyFilters(rows, filters), [rows, filters]);
   const kpi = useMemo(() => computeKpis(filtered), [filtered]);
@@ -56,6 +71,23 @@ export default function App() {
   const matrix = useMemo(() => matrixDisciplinaDia(filtered), [filtered]);
   const areas = useMemo(() => areaSummary(filtered), [filtered]);
 
+  useEffect(() => {
+    if (rows.length === 0) return;
+    const fechas = new Set(
+      rows
+        .map((r) => r.inicioProgramado)
+        .filter((d): d is Date => !!d)
+        .map((d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`),
+    );
+    if (!fechas.has(diaObjetivo) && fechas.size > 0) {
+      const sorted = Array.from(fechas).sort();
+      setDiaObjetivo(sorted[sorted.length - 1]);
+    }
+  }, [rows, diaObjetivo]);
+
+  const activeWeek = weeks.find((w) => w.weekId === activeWeekId) ?? null;
+  const hasData = rows.length > 0;
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
@@ -63,23 +95,36 @@ export default function App() {
           <div>
             <h1 className="text-xl font-bold">Dashboard Maximo — Cumplimiento semanal</h1>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Client-side · el Excel no sale del navegador · Puerto Pipeline
+              Client-side · IndexedDB local · Puerto Pipeline · turno 7×7
             </p>
           </div>
-          {fileName && (
+          {activeWeek && (
             <div className="text-right text-xs text-slate-500 dark:text-slate-400">
-              <div className="font-medium">{fileName}</div>
-              <div>Hoja: {sheetName} · {rows.length} OT</div>
+              <div className="font-medium">Semana activa: {activeWeek.weekId}</div>
+              <div>{rows.length} OTs · {activeWeek.updatedDays.length} días actualizados</div>
             </div>
           )}
         </div>
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-        {rows.length === 0 ? (
-          <FileUpload onFile={onFile} loading={loading} error={error} />
+        <WeekManager
+          weeks={weeks}
+          activeWeekId={activeWeekId}
+          onActiveWeekChange={setActiveWeekId}
+          onChange={refresh}
+        />
+
+        {!activeWeek ? (
+          <EmptyState />
+        ) : !hasData ? (
+          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-sm text-slate-500">
+            Cargando OTs de {activeWeek.weekId}…
+          </div>
         ) : (
           <>
+            <AdherenciaDiaria rows={rows} fecha={diaObjetivo} onChangeFecha={setDiaObjetivo} />
+
             <section className="flex flex-col gap-4">
               <FiltersBar rows={rows} value={filters} onChange={setFilters} />
               <KpiCards kpi={kpi} />
@@ -96,29 +141,31 @@ export default function App() {
             </section>
 
             <Limitations />
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setRows([]);
-                  setFileName(null);
-                  setSheetName(null);
-                  setFilters(DEFAULT_FILTERS);
-                }}
-                className="rounded-lg border border-slate-300 dark:border-slate-700 px-4 py-2 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
-              >
-                Cargar otro archivo
-              </button>
-            </div>
           </>
         )}
       </main>
 
       <footer className="max-w-7xl mx-auto px-4 py-6 text-xs text-slate-500 dark:text-slate-400">
-        Construido con React · Vite · Tailwind · Recharts · SheetJS. Estados Maximo:
+        Construido con React · Vite · Tailwind · Recharts · SheetJS · IndexedDB. Estados Maximo:
         {' '}
         <code>32-WPCOND</code>, <code>55-SCH</code>, <code>60-INPRG</code>, <code>70-COMP</code>. Completada = estado empieza con <code>70</code>.
       </footer>
+    </div>
+  );
+}
+
+function EmptyState() {
+  return (
+    <div className="rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-10 text-center">
+      <div className="text-lg font-semibold">Aún no hay semanas cargadas</div>
+      <div className="mt-2 text-sm text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">
+        <p>Flujo recomendado:</p>
+        <ol className="list-decimal text-left max-w-md mx-auto mt-2 space-y-1">
+          <li>Pulsa <strong>📚 Cargar base semanal</strong> con el archivo de la nueva semana (ej. <code>Adherencia diaria SEM 16.xlsx</code>).</li>
+          <li>Cada día pulsa <strong>🔄 Actualizar con export diario</strong> con el export de Maximo (<code>NNNNNNNN.xls</code>) — sólo se actualizan los estados de las OTs ya registradas.</li>
+          <li>Al final de la semana, carga la siguiente base. Las semanas previas quedan guardadas y consultables.</li>
+        </ol>
+      </div>
     </div>
   );
 }
@@ -127,18 +174,20 @@ function Limitations() {
   return (
     <details className="rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm">
       <summary className="cursor-pointer font-semibold text-amber-800 dark:text-amber-300">
-        Limitaciones conocidas del cálculo de Adherencia
+        Limitaciones conocidas y supuestos
       </summary>
       <div className="mt-2 space-y-2 text-amber-900 dark:text-amber-200">
         <p>
-          El export Maximo actual no incluye la fecha <em>real</em> de ejecución. Por eso la Adherencia se calcula
-          como: <strong>OTs completadas cuyo "Inicio previsto" coincide en día con "Inicio programado"</strong>, sobre el
-          total de OTs completadas.
+          <strong>Adherencia Diaria:</strong> usa <code>OTs en 70-COMP / Total programadas del día</code>, replicando
+          el pivote manual mientras Maximo no exporte la fecha real de ejecución.
         </p>
         <p>
-          Cuando el export incorpore un campo de "Inicio real" o "Fecha de ejecución", reemplazar en{' '}
-          <code>src/lib/kpi.ts → computeKpis</code> la comparación <code>inicioPrevisto vs inicioProgramado</code> por
-          <code> inicioReal vs inicioProgramado</code>.
+          <strong>Adherencia (KPI global):</strong> compara <code>Inicio previsto</code> vs <code>Inicio programado</code>
+          {' '}sobre OTs completadas. Cuando exista fecha real, reemplazar en <code>src/lib/kpi.ts → computeKpis</code>.
+        </p>
+        <p>
+          <strong>Persistencia:</strong> los datos se guardan en IndexedDB del navegador (local, no se sincronizan).
+          Si cambias de equipo o limpias datos del sitio, hay que recargar las bases.
         </p>
       </div>
     </details>
