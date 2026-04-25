@@ -68,9 +68,41 @@ function buildColumnMap(headerRow: unknown[]): ColumnMap {
   }
   const missing = (Object.keys(COLUMN_ALIASES) as (keyof ColumnMap)[]).filter((k) => map[k] === undefined);
   if (missing.length) {
-    throw new Error(`Faltan columnas en el Excel: ${missing.join(', ')}. Encabezados encontrados: ${headerRow.join(' | ')}`);
+    const visible = headerRow.map((c) => String(c ?? '').trim()).filter(Boolean).join(' | ') || '(fila vacía)';
+    throw new Error(`Faltan columnas en el Excel: ${missing.join(', ')}. Encabezados encontrados: ${visible}`);
   }
   return map as ColumnMap;
+}
+
+function countMatchingHeaders(row: unknown[]): number {
+  const normalized = row.map((h) => normalizeHeader(String(h ?? '')));
+  let hits = 0;
+  for (const aliases of Object.values(COLUMN_ALIASES)) {
+    for (const alias of aliases) {
+      if (normalized.includes(normalizeHeader(alias))) {
+        hits++;
+        break;
+      }
+    }
+  }
+  return hits;
+}
+
+function findHeaderRowIndex(matrix: unknown[][]): number {
+  const limit = Math.min(matrix.length, 30);
+  let bestIdx = 0;
+  let bestScore = -1;
+  for (let i = 0; i < limit; i++) {
+    const row = matrix[i];
+    if (!row) continue;
+    const score = countMatchingHeaders(row);
+    if (score > bestScore) {
+      bestScore = score;
+      bestIdx = i;
+    }
+    if (score >= 8) return i;
+  }
+  return bestIdx;
 }
 
 function normalizeHeader(s: string): string {
@@ -142,12 +174,13 @@ export async function parseWorkbook(file: File): Promise<ParseResult> {
   if (matrix.length < 2) {
     return { rows: [], sheetName: usedName, totalRows: 0, skipped: 0 };
   }
-  const header = matrix[0];
+  const headerRowIdx = findHeaderRowIndex(matrix);
+  const header = matrix[headerRowIdx];
   const map = buildColumnMap(header);
 
   const rows: WorkOrder[] = [];
   let skipped = 0;
-  for (let i = 1; i < matrix.length; i++) {
+  for (let i = headerRowIdx + 1; i < matrix.length; i++) {
     const r = matrix[i];
     if (!r || r.every((c) => c == null || c === '')) {
       skipped++;
