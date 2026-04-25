@@ -161,13 +161,15 @@ export async function parseWorkbook(file: File): Promise<ParseResult> {
     const grupoDueno = String(r[map.grupoDueno] ?? '').trim();
     const estado = String(r[map.estado] ?? '').trim();
     const ubicacion = String(r[map.ubicacion] ?? '').trim();
+    const inicioPrevisto = parseExcelDate(r[map.inicioPrevisto]);
+    const inicioProgramado = parseExcelDate(r[map.inicioProgramado]);
 
     const wo: WorkOrder = {
       orden,
       descripcion,
       ubicacion,
-      inicioPrevisto: parseExcelDate(r[map.inicioPrevisto]),
-      inicioProgramado: parseExcelDate(r[map.inicioProgramado]),
+      inicioPrevisto,
+      inicioProgramado,
       finalizacionPrevista: parseExcelDate(r[map.finalizacionPrevista]),
       estado,
       zonaTrabajo: String(r[map.zonaTrabajo] ?? '').trim(),
@@ -177,7 +179,7 @@ export async function parseWorkbook(file: File): Promise<ParseResult> {
       prioridad: normalizePrioridad(r[map.prioridad]),
       planta: String(r[map.planta] ?? '').trim(),
 
-      semana: deriveSemana(descripcion),
+      semana: deriveSemana(descripcion, inicioProgramado ?? inicioPrevisto),
       area: deriveArea(descripcion, ubicacion),
       disciplina: deriveDisciplina(grupoDueno),
       completada: isCompletada(estado),

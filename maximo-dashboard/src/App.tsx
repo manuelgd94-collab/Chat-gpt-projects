@@ -16,7 +16,9 @@ import {
   curvaS,
   defaultTargetDate,
   matrixDisciplinaDia,
+  uniqueSemanas,
 } from './lib/kpi';
+import { currentSemana } from './lib/derive';
 import type { Filters, WorkOrder } from './lib/types';
 
 const DEFAULT_FILTERS: Filters = {
@@ -43,7 +45,12 @@ export default function App() {
       setRows(r.rows);
       setFileName(f.name);
       setSheetName(r.sheetName);
-      setFilters(DEFAULT_FILTERS);
+
+      const semanas = uniqueSemanas(r.rows);
+      const currentW = currentSemana();
+      const defaultSemana =
+        semanas.includes(currentW) ? currentW : semanas[semanas.length - 1] ?? 'TODAS';
+      setFilters({ ...DEFAULT_FILTERS, semana: defaultSemana });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
       setRows([]);
