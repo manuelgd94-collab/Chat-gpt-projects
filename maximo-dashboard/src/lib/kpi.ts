@@ -168,3 +168,85 @@ export function uniqueProgramas(rows: WorkOrder[]): string[] {
 export function uniqueAreas(rows: WorkOrder[]): string[] {
   return Array.from(new Set(rows.map((r) => r.area))).sort();
 }
+
+export const ESTADOS_PIVOT = ['32-WPCOND', '55-SCH', '60-INPRG', '70-COMP'] as const;
+export type EstadoPivot = (typeof ESTADOS_PIVOT)[number];
+
+function normalizeEstado(estado: string): EstadoPivot | null {
+  const s = (estado ?? '').trim().toUpperCase().replace(/\s+/g, '');
+  for (const e of ESTADOS_PIVOT) {
+    if (s.startsWith(e.toUpperCase())) return e;
+  }
+  return null;
+}
+
+export interface PivotRow {
+  disciplina: string;
+  counts: Record<EstadoPivot, number>;
+  total: number;
+  adherencia: number;
+}
+
+export interface DailyAdherencePivot {
+  fecha: string;
+  rows: PivotRow[];
+  totalRow: PivotRow;
+}
+
+export function adherenciaDiariaPivot(allRows: WorkOrder[], fecha: string): DailyAdherencePivot {
+  const dayRows = allRows.filter((r) => dayKey(r.inicioProgramado) === fecha);
+
+  const byDisc = new Map<string, Record<EstadoPivot, number>>();
+  for (const r of dayRows) {
+    const est = normalizeEstado(r.estado);
+    if (!est) continue;
+    const counts = byDisc.get(r.disciplina) ?? makeEmptyCounts();
+    counts[est] += 1;
+    byDisc.set(r.disciplina, counts);
+  }
+
+  const rows: PivotRow[] = Array.from(byDisc.entries())
+    .map(([disciplina, counts]) => {
+      const total = ESTADOS_PIVOT.reduce((s, e) => s + counts[e], 0);
+      const adherencia = total > 0 ? counts['70-COMP'] / total : 0;
+      return { disciplina, counts, total, adherencia };
+    })
+    .sort((a, b) => a.disciplina.localeCompare(b.disciplina));
+
+  const totalCounts = makeEmptyCounts();
+  for (const r of rows) {
+    for (const e of ESTADOS_PIVOT) totalCounts[e] += r.counts[e];
+  }
+  const grandTotal = ESTADOS_PIVOT.reduce((s, e) => s + totalCounts[e], 0);
+  const totalRow: PivotRow = {
+    disciplina: 'Total general',
+    counts: totalCounts,
+    total: grandTotal,
+    adherencia: grandTotal > 0 ? totalCounts['70-COMP'] / grandTotal : 0,
+  };
+
+  return { fecha, rows, totalRow };
+}
+
+function makeEmptyCounts(): Record<EstadoPivot, number> {
+  return { '32-WPCOND': 0, '55-SCH': 0, '60-INPRG': 0, '70-COMP': 0 };
+}
+
+export function defaultTargetDate(now: Date = new Date()): string {
+  const d = new Date(now);
+  if (now.getHours() < 9) {
+    d.setDate(d.getDate() - 1);
+  } else {
+    d.setDate(d.getDate() - 1);
+  }
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export function uniqueProgramadosDates(rows: WorkOrder[]): string[] {
+  const set = new Set<string>();
+  for (const r of rows) {
+    const k = dayKey(r.inicioProgramado);
+    if (k) set.add(k);
+  }
+  return Array.from(set).sort();
+}

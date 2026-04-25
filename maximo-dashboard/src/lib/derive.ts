@@ -23,30 +23,31 @@ export function deriveArea(descripcion: string, ubicacion: string): Area {
   return 'OTRO';
 }
 
-const DISC_CODE_MAP: Record<string, string> = {
-  MEC: 'Mecánicos',
-  ELE: 'Eléctricos',
-  INS: 'Instrumentista',
-  DCS: 'DCS',
-  MON: 'Moncon',
-  LUB: 'Lubricador',
-};
+const DISC_PATTERNS: Array<{ re: RegExp; label: string }> = [
+  { re: /DCS/i, label: 'DCS' },
+  { re: /MEC/i, label: 'Mecánicos' },
+  { re: /LUB/i, label: 'Lubricador' },
+  { re: /MON/i, label: 'Moncon' },
+  { re: /ELE/i, label: 'Eléctricos' },
+  { re: /INS/i, label: 'Instrumentista' },
+  { re: /^P[LT]EL\d|^P[LT]EL$/i, label: 'Eléctricos' },
+  { re: /^P[LT]IN\d|^P[LT]IN$/i, label: 'Instrumentista' },
+];
 
 export function deriveDisciplina(grupoDueno: string): string {
   const s = (grupoDueno ?? '').trim();
   if (!s) return 'Sin disciplina';
 
-  for (const [code, label] of Object.entries(DISC_CODE_MAP)) {
-    if (new RegExp(`\\b${code}\\b`, 'i').test(s)) return label;
+  for (const { re, label } of DISC_PATTERNS) {
+    if (re.test(s)) return label;
   }
 
   const lower = s.toLowerCase();
-  if (lower.includes('mec')) return 'Mecánicos';
-  if (lower.includes('elec') || lower.includes('eléc')) return 'Eléctricos';
+  if (lower.includes('eléc') || lower.includes('elec')) return 'Eléctricos';
   if (lower.includes('inst')) return 'Instrumentista';
-  if (lower.includes('dcs')) return 'DCS';
-  if (lower.includes('moncon') || lower.includes('mon-con')) return 'Moncon';
+  if (lower.includes('mec')) return 'Mecánicos';
   if (lower.includes('lubric')) return 'Lubricador';
+  if (lower.includes('moncon') || lower.includes('mon-con')) return 'Moncon';
 
   return s;
 }

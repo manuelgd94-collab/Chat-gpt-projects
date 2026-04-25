@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FileUpload } from './components/FileUpload';
 import { FiltersBar } from './components/Filters';
 import { KpiCards } from './components/KpiCards';
@@ -6,6 +6,7 @@ import { PlanVsReal } from './components/PlanVsReal';
 import { CurvaS } from './components/CurvaS';
 import { Matrix } from './components/Matrix';
 import { AreaSummary } from './components/AreaSummary';
+import { AdherenciaDiaria } from './components/AdherenciaDiaria';
 import { parseWorkbook } from './lib/parser';
 import {
   applyFilters,
@@ -13,6 +14,7 @@ import {
   bucketByDay,
   computeKpis,
   curvaS,
+  defaultTargetDate,
   matrixDisciplinaDia,
 } from './lib/kpi';
 import type { Filters, WorkOrder } from './lib/types';
@@ -31,6 +33,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+  const [diaObjetivo, setDiaObjetivo] = useState<string>(() => defaultTargetDate());
 
   const onFile = async (f: File) => {
     setLoading(true);
@@ -56,6 +59,20 @@ export default function App() {
   const matrix = useMemo(() => matrixDisciplinaDia(filtered), [filtered]);
   const areas = useMemo(() => areaSummary(filtered), [filtered]);
 
+  useEffect(() => {
+    if (rows.length === 0) return;
+    const fechas = new Set(
+      rows
+        .map((r) => r.inicioProgramado)
+        .filter((d): d is Date => !!d)
+        .map((d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`),
+    );
+    if (!fechas.has(diaObjetivo) && fechas.size > 0) {
+      const sorted = Array.from(fechas).sort();
+      setDiaObjetivo(sorted[sorted.length - 1]);
+    }
+  }, [rows, diaObjetivo]);
+
   return (
     <div className="min-h-screen">
       <header className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
@@ -80,6 +97,8 @@ export default function App() {
           <FileUpload onFile={onFile} loading={loading} error={error} />
         ) : (
           <>
+            <AdherenciaDiaria rows={rows} fecha={diaObjetivo} onChangeFecha={setDiaObjetivo} />
+
             <section className="flex flex-col gap-4">
               <FiltersBar rows={rows} value={filters} onChange={setFilters} />
               <KpiCards kpi={kpi} />
@@ -131,9 +150,11 @@ function Limitations() {
       </summary>
       <div className="mt-2 space-y-2 text-amber-900 dark:text-amber-200">
         <p>
-          El export Maximo actual no incluye la fecha <em>real</em> de ejecución. Por eso la Adherencia se calcula
-          como: <strong>OTs completadas cuyo "Inicio previsto" coincide en día con "Inicio programado"</strong>, sobre el
-          total de OTs completadas.
+          El export Maximo actual no incluye la fecha <em>real</em> de ejecución. Por eso la Adherencia (de la sección
+          de KPIs globales) se calcula como: <strong>OTs completadas cuyo "Inicio previsto" coincide en día con
+          "Inicio programado"</strong>, sobre el total de OTs completadas. La tabla "Adherencia Diaria" usa la
+          definición operativa actual: <strong>OTs en 70-COMP / Total programadas del día</strong>, replicando el
+          pivote manual.
         </p>
         <p>
           Cuando el export incorpore un campo de "Inicio real" o "Fecha de ejecución", reemplazar en{' '}
