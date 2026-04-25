@@ -48,9 +48,10 @@ function findSheet(wb: XLSX.WorkBook): XLSX.WorkSheet {
     n.toLowerCase().replace(/\s+/g, ' ').startsWith('lista de ordenes de trabajo'),
   );
   if (normalized) return wb.Sheets[normalized];
-  throw new Error(
-    `No se encontró hoja "Lista de Órdenes de trabajo1" ni alternativa. Hojas disponibles: ${wb.SheetNames.join(', ')}`,
-  );
+  if (wb.SheetNames.length > 0) {
+    return wb.Sheets[wb.SheetNames[0]];
+  }
+  throw new Error(`Archivo Excel sin hojas. Esperaba "Lista de Órdenes de trabajo1" o cualquier hoja con las columnas Maximo.`);
 }
 
 function buildColumnMap(headerRow: unknown[]): ColumnMap {
