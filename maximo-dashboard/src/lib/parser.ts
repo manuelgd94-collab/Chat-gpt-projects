@@ -39,19 +39,43 @@ interface ColumnMap {
   planta: number;
 }
 
-function findSheet(wb: XLSX.WorkBook): XLSX.WorkSheet {
+interface SheetCandidate {
+  name: string;
+  sheet: XLSX.WorkSheet;
+  matrix: unknown[][];
+  headerRowIdx: number;
+  score: number;
+}
+
+function readMatrix(sheet: XLSX.WorkSheet): unknown[][] {
+  return XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: null });
+}
+
+function chooseBestSheet(wb: XLSX.WorkBook): SheetCandidate {
+  if (wb.SheetNames.length === 0) {
+    throw new Error('El archivo no contiene hojas legibles. Posiblemente sea un .xls en formato HTML/XML no soportado — intenta abrirlo en Excel y guardarlo como .xlsx.');
+  }
+
   for (const name of SHEET_CANDIDATES) {
-    if (wb.SheetNames.includes(name)) return wb.Sheets[name];
+    if (!wb.SheetNames.includes(name)) continue;
+    const sheet = wb.Sheets[name];
+    const matrix = readMatrix(sheet);
+    const headerRowIdx = findHeaderRowIndex(matrix);
+    const score = matrix[headerRowIdx] ? countMatchingHeaders(matrix[headerRowIdx]) : 0;
+    if (score >= 8) return { name, sheet, matrix, headerRowIdx, score };
   }
-  const normalized = wb.SheetNames.find((n) =>
-    n.toLowerCase().replace(/\s+/g, ' ').startsWith('lista de órdenes de trabajo') ||
-    n.toLowerCase().replace(/\s+/g, ' ').startsWith('lista de ordenes de trabajo'),
-  );
-  if (normalized) return wb.Sheets[normalized];
-  if (wb.SheetNames.length > 0) {
-    return wb.Sheets[wb.SheetNames[0]];
+
+  let best: SheetCandidate | null = null;
+  for (const name of wb.SheetNames) {
+    const sheet = wb.Sheets[name];
+    const matrix = readMatrix(sheet);
+    const headerRowIdx = findHeaderRowIndex(matrix);
+    const score = matrix[headerRowIdx] ? countMatchingHeaders(matrix[headerRowIdx]) : 0;
+    if (!best || score > best.score) {
+      best = { name, sheet, matrix, headerRowIdx, score };
+    }
   }
-  throw new Error(`Archivo Excel sin hojas. Esperaba "Lista de Órdenes de trabajo1" o cualquier hoja con las columnas Maximo.`);
+  return best!;
 }
 
 function buildColumnMap(headerRow: unknown[]): ColumnMap {
@@ -164,22 +188,48 @@ export interface ParseResult {
   skipped: number;
 }
 
+function buildDiagnostic(wb: XLSX.WorkBook, choice: SheetCandidate): string {
+  const sheets = wb.SheetNames.map((n) => {
+    const m = readMatrix(wb.Sheets[n]);
+    const nonEmpty = m.filter((r) => r && r.some((c) => c != null && c !== '')).length;
+    return `"${n}" (${nonEmpty} filas con datos)`;
+  }).join(', ');
+
+  const preview = choice.matrix
+    .slice(0, 5)
+    .map((row, i) => {
+      const cells = (row ?? []).map((c) => String(c ?? '').trim()).filter(Boolean).slice(0, 6);
+      return `  fila ${i + 1}: ${cells.join(' | ') || '(vacía)'}`;
+    })
+    .join('\n');
+
+  return [
+    `No pude detectar las columnas de Maximo en el archivo.`,
+    `Hojas en el libro: ${sheets || '(ninguna)'}`,
+    `Hoja elegida: "${choice.name}" (matches de encabezado: ${choice.score}/13)`,
+    `Primeras filas:`,
+    preview,
+    `Sugerencias:`,
+    `  • Si el .xls viene de Maximo, ábrelo en Excel y guárdalo como .xlsx.`,
+    `  • Verifica que la primera hoja del libro tenga las columnas: Orden de trabajo, Descripción, Inicio previsto, Inicio programado, Estado, Grupo del dueño, etc.`,
+  ].join('\n');
+}
+
 export async function parseWorkbook(file: File): Promise<ParseResult> {
   const buf = await file.arrayBuffer();
   const wb = XLSX.read(buf, { type: 'array', cellDates: false });
-  const sheet = findSheet(wb);
-  const usedName = wb.SheetNames.find((n) => wb.Sheets[n] === sheet) ?? '';
+  const choice = chooseBestSheet(wb);
+  const { sheet, name: usedName, matrix, headerRowIdx, score } = choice;
 
-  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, raw: true, defval: null });
-  if (matrix.length < 2) {
-    return { rows: [], sheetName: usedName, totalRows: 0, skipped: 0 };
+  if (matrix.length < 2 || score === 0) {
+    throw new Error(buildDiagnostic(wb, choice));
   }
-  const headerRowIdx = findHeaderRowIndex(matrix);
   const header = matrix[headerRowIdx];
   const map = buildColumnMap(header);
 
   const rows: WorkOrder[] = [];
   let skipped = 0;
+  void sheet;
   for (let i = headerRowIdx + 1; i < matrix.length; i++) {
     const r = matrix[i];
     if (!r || r.every((c) => c == null || c === '')) {

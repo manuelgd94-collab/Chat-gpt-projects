@@ -170,15 +170,15 @@ export function WeekManager({ weeks, activeWeekId, onActiveWeekChange, onChange 
       )}
 
       {msg && (
-        <div
-          className={`mt-3 rounded-lg px-3 py-2 text-sm ${
+        <pre
+          className={`mt-3 rounded-lg px-3 py-2 text-xs whitespace-pre-wrap font-mono ${
             msg.kind === 'ok'
               ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200'
               : 'bg-red-50 text-red-800 dark:bg-red-950/30 dark:text-red-200'
           }`}
         >
           {msg.text}
-        </div>
+        </pre>
       )}
     </div>
   );
