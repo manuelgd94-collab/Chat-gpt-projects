@@ -8,6 +8,8 @@ import { AreaSummary } from './components/AreaSummary';
 import { AdherenciaDiaria } from './components/AdherenciaDiaria';
 import { WeekManager } from './components/WeekManager';
 import { OtListas } from './components/OtListas';
+import { DisciplinaPills } from './components/DisciplinaPills';
+import { DisciplinaSummary } from './components/DisciplinaSummary';
 import {
   applyFilters,
   areaSummary,
@@ -15,6 +17,7 @@ import {
   computeKpis,
   curvaS,
   defaultTargetDate,
+  disciplinaSummary,
   matrixDisciplinaDia,
 } from './lib/kpi';
 import { getWeekOrders, listWeeks, type WeekMeta } from './lib/db';
@@ -66,11 +69,16 @@ export default function App() {
   }, [activeWeekId, bumpId]);
 
   const filtered = useMemo(() => applyFilters(rows, filters), [rows, filters]);
+  const filteredExceptDisciplina = useMemo(
+    () => applyFilters(rows, { ...filters, disciplina: 'TODAS' }),
+    [rows, filters],
+  );
   const kpi = useMemo(() => computeKpis(filtered), [filtered]);
   const buckets = useMemo(() => bucketByDay(filtered), [filtered]);
   const curva = useMemo(() => curvaS(buckets), [buckets]);
   const matrix = useMemo(() => matrixDisciplinaDia(filtered), [filtered]);
   const areas = useMemo(() => areaSummary(filtered), [filtered]);
+  const discSummary = useMemo(() => disciplinaSummary(filteredExceptDisciplina), [filteredExceptDisciplina]);
 
   useEffect(() => {
     if (rows.length === 0) return;
@@ -126,6 +134,12 @@ export default function App() {
           <>
             <AdherenciaDiaria rows={rows} fecha={diaObjetivo} onChangeFecha={setDiaObjetivo} />
 
+            <DisciplinaPills
+              rows={filteredExceptDisciplina}
+              value={filters.disciplina}
+              onChange={(d) => setFilters({ ...filters, disciplina: d })}
+            />
+
             <section className="flex flex-col gap-4">
               <FiltersBar rows={rows} value={filters} onChange={setFilters} />
               <KpiCards kpi={kpi} />
@@ -138,8 +152,14 @@ export default function App() {
 
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Matrix disciplinas={matrix.disciplinas} dias={matrix.dias} cells={matrix.cells} />
-              <AreaSummary rows={areas} />
+              <DisciplinaSummary
+                rows={discSummary}
+                activeDisciplina={filters.disciplina}
+                onSelectDisciplina={(d) => setFilters({ ...filters, disciplina: d })}
+              />
             </section>
+
+            <AreaSummary rows={areas} />
 
             <OtListas rows={filtered} />
 

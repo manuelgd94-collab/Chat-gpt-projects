@@ -153,6 +153,35 @@ export function areaSummary(rows: WorkOrder[]): AreaSummaryRow[] {
     .sort((a, b) => b.plan - a.plan);
 }
 
+export interface DisciplinaSummaryRow {
+  disciplina: string;
+  plan: number;
+  real: number;
+  cumplimiento: number;
+  adherencia: number;
+}
+
+export function disciplinaSummary(rows: WorkOrder[]): DisciplinaSummaryRow[] {
+  const byDisc = new Map<string, WorkOrder[]>();
+  for (const r of rows) {
+    const list = byDisc.get(r.disciplina) ?? [];
+    list.push(r);
+    byDisc.set(r.disciplina, list);
+  }
+  return Array.from(byDisc.entries())
+    .map(([disciplina, list]) => {
+      const k = computeKpis(list);
+      return {
+        disciplina,
+        plan: k.planCount,
+        real: k.realCount,
+        cumplimiento: k.cumplimiento,
+        adherencia: k.adherencia,
+      };
+    })
+    .sort((a, b) => b.plan - a.plan);
+}
+
 export function uniqueSemanas(rows: WorkOrder[]): string[] {
   return Array.from(new Set(rows.map((r) => r.semana).filter((s): s is string => !!s))).sort();
 }
