@@ -7,6 +7,7 @@ import { Matrix } from './components/Matrix';
 import { AreaSummary } from './components/AreaSummary';
 import { AdherenciaDiaria } from './components/AdherenciaDiaria';
 import { WeekManager } from './components/WeekManager';
+import { OtListas } from './components/OtListas';
 import {
   applyFilters,
   areaSummary,
@@ -139,6 +140,8 @@ export default function App() {
               <Matrix disciplinas={matrix.disciplinas} dias={matrix.dias} cells={matrix.cells} />
               <AreaSummary rows={areas} />
             </section>
+
+            <OtListas rows={filtered} />
 
             <Limitations />
           </>
