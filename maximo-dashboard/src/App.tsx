@@ -11,15 +11,20 @@ import { OtListas } from './components/OtListas';
 import { DisciplinaPills } from './components/DisciplinaPills';
 import { DisciplinaSummary } from './components/DisciplinaSummary';
 import { CodigosSinClasificar } from './components/CodigosSinClasificar';
+import { KpisPlanificacion } from './components/KpisPlanificacion';
+import { NPSeguimiento } from './components/NPSeguimiento';
 import {
   applyFilters,
   areaSummary,
+  backlogSemanal,
   bucketByDay,
   computeKpis,
   curvaS,
   defaultTargetDate,
   disciplinaSummary,
   matrixDisciplinaDia,
+  npDailyBuckets,
+  pmCompliance,
 } from './lib/kpi';
 import { getWeekOrders, listWeeks, type WeekMeta } from './lib/db';
 import type { Filters, WorkOrder } from './lib/types';
@@ -80,6 +85,11 @@ export default function App() {
   const matrix = useMemo(() => matrixDisciplinaDia(filtered), [filtered]);
   const areas = useMemo(() => areaSummary(filtered), [filtered]);
   const discSummary = useMemo(() => disciplinaSummary(filteredExceptDisciplina), [filteredExceptDisciplina]);
+  const pm = useMemo(() => pmCompliance(filtered), [filtered]);
+  const backlog = useMemo(() => backlogSemanal(filtered), [filtered]);
+  const npBuckets = useMemo(() => npDailyBuckets(filtered), [filtered]);
+  const npPlan = useMemo(() => npBuckets.reduce((s, b) => s + b.plan, 0), [npBuckets]);
+  const npReal = useMemo(() => npBuckets.reduce((s, b) => s + b.real, 0), [npBuckets]);
 
   useEffect(() => {
     if (rows.length === 0) return;
@@ -144,12 +154,20 @@ export default function App() {
             <section className="flex flex-col gap-4">
               <FiltersBar rows={rows} value={filters} onChange={setFilters} />
               <KpiCards kpi={kpi} />
+              <KpisPlanificacion
+                pm={pm}
+                backlogCount={backlog.length}
+                npPlan={npPlan}
+                npReal={npReal}
+              />
             </section>
 
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <PlanVsReal data={buckets} />
               <CurvaS data={curva} />
             </section>
+
+            <NPSeguimiento data={npBuckets} />
 
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Matrix disciplinas={matrix.disciplinas} dias={matrix.dias} cells={matrix.cells} />
