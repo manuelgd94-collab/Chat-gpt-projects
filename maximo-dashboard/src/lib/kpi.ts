@@ -1,5 +1,5 @@
 import type { DayBucket, Filters, KpiSummary, MatrixCell, WorkOrder } from './types';
-import { dayKey, dayLabel, derivePrograma, sameDay } from './derive';
+import { dayKey, dayLabel, derivePrograma, isNP, sameDay, tipoMantenimiento } from './derive';
 
 export function applyFilters(rows: WorkOrder[], f: Filters): WorkOrder[] {
   return rows.filter((r) => {
@@ -269,6 +269,85 @@ export function defaultTargetDate(now: Date = new Date()): string {
     d.setDate(d.getDate() - 1);
   }
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export interface PmComplianceResult {
+  pmPlan: number;
+  pmReal: number;
+  pmRatio: number;
+  cmPlan: number;
+  cmReal: number;
+  cmRatio: number;
+  otroPlan: number;
+  otroReal: number;
+  ratioPmCm: number;
+}
+
+export function pmCompliance(rows: WorkOrder[]): PmComplianceResult {
+  let pmPlan = 0;
+  let pmReal = 0;
+  let cmPlan = 0;
+  let cmReal = 0;
+  let otroPlan = 0;
+  let otroReal = 0;
+  for (const r of rows) {
+    if (r.inicioProgramado == null) continue;
+    const tipo = tipoMantenimiento(r);
+    if (tipo === 'Preventivo') {
+      pmPlan++;
+      if (r.completada) pmReal++;
+    } else if (tipo === 'Correctivo') {
+      cmPlan++;
+      if (r.completada) cmReal++;
+    } else {
+      otroPlan++;
+      if (r.completada) otroReal++;
+    }
+  }
+  const totalPmCm = pmPlan + cmPlan;
+  return {
+    pmPlan,
+    pmReal,
+    pmRatio: pmPlan > 0 ? pmReal / pmPlan : 0,
+    cmPlan,
+    cmReal,
+    cmRatio: cmPlan > 0 ? cmReal / cmPlan : 0,
+    otroPlan,
+    otroReal,
+    ratioPmCm: totalPmCm > 0 ? pmPlan / totalPmCm : 0,
+  };
+}
+
+export function backlogSemanal(rows: WorkOrder[], hoy: Date = new Date()): WorkOrder[] {
+  const hasta = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate(), 23, 59, 59, 999);
+  return rows.filter((r) => {
+    if (r.completada) return false;
+    if (!r.inicioProgramado) return false;
+    return r.inicioProgramado.getTime() <= hasta.getTime();
+  });
+}
+
+export interface NPBucket {
+  dia: string;
+  label: string;
+  plan: number;
+  real: number;
+}
+
+export function npDailyBuckets(rows: WorkOrder[]): NPBucket[] {
+  const nps = rows.filter(isNP);
+  const map = new Map<string, { plan: number; real: number }>();
+  for (const r of nps) {
+    const k = dayKey(r.inicioProgramado);
+    if (!k) continue;
+    const b = map.get(k) ?? { plan: 0, real: 0 };
+    b.plan++;
+    if (r.completada) b.real++;
+    map.set(k, b);
+  }
+  return Array.from(map.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dia, v]) => ({ dia, label: dayLabel(dia), plan: v.plan, real: v.real }));
 }
 
 export function uniqueProgramadosDates(rows: WorkOrder[]): string[] {

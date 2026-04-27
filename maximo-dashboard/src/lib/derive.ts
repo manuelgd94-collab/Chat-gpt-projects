@@ -70,6 +70,36 @@ export function isCompletada(estado: string): boolean {
   return /^70/.test((estado ?? '').trim());
 }
 
+export type TipoMantenimiento = 'Preventivo' | 'Correctivo' | 'Otro';
+
+const TIPO_OT_PM = new Set(['PM', 'INSP', 'PREV', 'PREVENTIVO']);
+const TIPO_OT_CM = new Set(['CM', 'CMPR', 'EMER', 'WR', 'CORR', 'CORRECTIVO']);
+
+export function tipoMantenimiento(wo: { tipoOT: string; descripcion: string }): TipoMantenimiento {
+  const t = (wo.tipoOT ?? '').trim().toUpperCase();
+  if (TIPO_OT_PM.has(t)) return 'Preventivo';
+  if (TIPO_OT_CM.has(t)) return 'Correctivo';
+
+  const desc = (wo.descripcion ?? '').trim().toUpperCase();
+  if (/^MP\b/.test(desc) || /\sMP\s/.test(desc)) return 'Preventivo';
+  if (/^WR\b/.test(desc) || /\sWR\s/.test(desc)) return 'Correctivo';
+
+  return 'Otro';
+}
+
+export function prioridadNum(wo: { prioridad: string | number | null }): number | null {
+  const p = wo.prioridad;
+  if (p == null) return null;
+  if (typeof p === 'number') return Number.isFinite(p) ? p : null;
+  const n = parseInt(String(p).replace(/[^\d-]/g, ''), 10);
+  return isNaN(n) ? null : n;
+}
+
+export function isNP(wo: { prioridad: string | number | null }): boolean {
+  const n = prioridadNum(wo);
+  return n !== null && n >= 1 && n <= 3;
+}
+
 export function derivePrograma(wo: { descripcion: string; ubicacion: string }): string {
   const src = `${wo.descripcion ?? ''} ${wo.ubicacion ?? ''}`.toUpperCase();
   if (src.includes('PIPELINE') || src.includes('PIP') || src.includes('PRT')) return 'Puerto Pipeline';
