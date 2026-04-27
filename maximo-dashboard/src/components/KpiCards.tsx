@@ -1,4 +1,5 @@
 import type { KpiSummary } from '../lib/types';
+import { fmtInt } from '../lib/format';
 
 interface Props {
   kpi: KpiSummary;
@@ -18,11 +19,11 @@ export function KpiCards({ kpi }: Props) {
       tone: tone(kpi.adherencia),
       hint: 'OT completadas con previsto = programado',
     },
-    { label: 'OT Plan', value: String(kpi.planCount), tone: 'neutral' as const },
-    { label: 'OT Real', value: String(kpi.realCount), tone: 'neutral' as const },
+    { label: 'OT Plan', value: fmtInt(kpi.planCount), tone: 'neutral' as const },
+    { label: 'OT Real', value: fmtInt(kpi.realCount), tone: 'neutral' as const },
     {
       label: 'Desviación',
-      value: `${kpi.desviacion >= 0 ? '+' : ''}${kpi.desviacion}`,
+      value: `${kpi.desviacion >= 0 ? '+' : ''}${fmtInt(kpi.desviacion)}`,
       tone: kpi.desviacion >= 0 ? ('ok' as const) : ('bad' as const),
     },
   ];

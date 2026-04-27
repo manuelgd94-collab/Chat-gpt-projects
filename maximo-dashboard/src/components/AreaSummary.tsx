@@ -1,38 +1,62 @@
 import type { AreaSummaryRow } from '../lib/kpi';
+import { CopyCsvButton } from './CopyCsvButton';
+import { fmtInt, fmtPct } from '../lib/format';
 
 export function AreaSummary({ rows }: { rows: AreaSummaryRow[] }) {
+  const totalPlan = rows.reduce((s, r) => s + r.plan, 0);
+  const totalReal = rows.reduce((s, r) => s + r.real, 0);
+  const totalCumpl = totalPlan > 0 ? totalReal / totalPlan : 0;
+  const csvRows = rows.map((r) => [r.area, r.plan, r.real, fmtPct(r.cumplimiento), fmtPct(r.adherencia)]);
+  csvRows.push(['Total', totalPlan, totalReal, fmtPct(totalCumpl), '']);
+
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
-      <div className="mb-2 text-sm font-semibold">Resumen por área</div>
+      <div className="flex items-center justify-between mb-2">
+        <div className="text-sm font-semibold">Resumen por área</div>
+        <CopyCsvButton headers={['Área', 'Plan', 'Real', '%Cumpl', '%Adher']} rows={csvRows} />
+      </div>
       {rows.length === 0 ? (
         <div className="text-sm text-slate-500">Sin datos.</div>
       ) : (
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left text-slate-500 dark:text-slate-400">
-              <th className="py-1">Área</th>
-              <th className="py-1 text-right">Plan</th>
-              <th className="py-1 text-right">Real</th>
-              <th className="py-1 text-right">% Cumpl.</th>
-              <th className="py-1 text-right">% Adher.</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.area} className="border-t border-slate-200 dark:border-slate-800">
-                <td className="py-1 font-medium">{r.area}</td>
-                <td className="py-1 text-right">{r.plan}</td>
-                <td className="py-1 text-right">{r.real}</td>
-                <td className={`py-1 text-right ${pctClass(r.cumplimiento)}`}>
-                  {(r.cumplimiento * 100).toFixed(1)}%
-                </td>
-                <td className={`py-1 text-right ${pctClass(r.adherencia)}`}>
-                  {(r.adherencia * 100).toFixed(1)}%
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 bg-white dark:bg-slate-900">
+              <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800">
+                <th className="py-1">Área</th>
+                <th className="py-1 text-right">Plan</th>
+                <th className="py-1 text-right">Real</th>
+                <th className="py-1 text-right">% Cumpl.</th>
+                <th className="py-1 text-right">% Adher.</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr
+                  key={r.area}
+                  className={[
+                    'border-b border-slate-100 dark:border-slate-800/50',
+                    i % 2 ? 'bg-slate-50/50 dark:bg-slate-800/20' : '',
+                  ].join(' ')}
+                >
+                  <td className="py-1 font-medium">{r.area}</td>
+                  <td className="py-1 text-right tabular-nums">{fmtInt(r.plan)}</td>
+                  <td className="py-1 text-right tabular-nums">{fmtInt(r.real)}</td>
+                  <td className={`py-1 text-right tabular-nums ${pctClass(r.cumplimiento)}`}>{fmtPct(r.cumplimiento)}</td>
+                  <td className={`py-1 text-right tabular-nums ${pctClass(r.adherencia)}`}>{fmtPct(r.adherencia)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t-2 border-slate-300 dark:border-slate-600 font-semibold bg-slate-100 dark:bg-slate-800/40">
+                <td className="py-1">Total</td>
+                <td className="py-1 text-right tabular-nums">{fmtInt(totalPlan)}</td>
+                <td className="py-1 text-right tabular-nums">{fmtInt(totalReal)}</td>
+                <td className={`py-1 text-right tabular-nums ${pctClass(totalCumpl)}`}>{fmtPct(totalCumpl)}</td>
+                <td className="py-1 text-right tabular-nums text-slate-400">—</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
       )}
     </div>
   );

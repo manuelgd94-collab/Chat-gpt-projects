@@ -1,6 +1,8 @@
 import { useMemo } from 'react';
 import type { WorkOrder } from '../lib/types';
 import { ESTADOS_PIVOT, adherenciaDiariaPivot, uniqueProgramadosDates } from '../lib/kpi';
+import { CopyCsvButton } from './CopyCsvButton';
+import { fmtPct } from '../lib/format';
 
 interface Props {
   rows: WorkOrder[];
@@ -36,6 +38,13 @@ export function AdherenciaDiaria({ rows, fecha, onChangeFecha }: Props) {
               <option key={d} value={d} />
             ))}
           </datalist>
+          <CopyCsvButton
+            headers={['Especialidad', ...ESTADOS_PIVOT, 'Total general', '% Adherencia al Programa']}
+            rows={[
+              ...pivot.rows.map((r) => [r.disciplina, ...ESTADOS_PIVOT.map((e) => r.counts[e]), r.total, fmtPct(r.adherencia, 0)]),
+              [pivot.totalRow.disciplina, ...ESTADOS_PIVOT.map((e) => pivot.totalRow.counts[e]), pivot.totalRow.total, fmtPct(pivot.totalRow.adherencia, 0)],
+            ]}
+          />
         </div>
       </div>
 
