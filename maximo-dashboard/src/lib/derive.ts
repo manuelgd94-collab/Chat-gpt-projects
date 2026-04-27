@@ -28,17 +28,19 @@ export function currentSemana(): string {
   return semanaFromDate(new Date()) as string;
 }
 
-const AREA_RE = /\b(PRT|PIP|PIPELINE|DESAL|DSL|PLNT|PLANT|PLANTA)\b/i;
+const PUERTO_TAGS = /^(0520|0530|0590|0540)/;
+const DESALADORA_TAGS = /^(0575|0571)/;
+const PIP_TOKEN = /\bPIP\b/i;
 
-export function deriveArea(descripcion: string, ubicacion: string): Area {
-  const src = `${descripcion ?? ''} ${ubicacion ?? ''}`;
-  const m = src.match(AREA_RE);
-  if (!m) return 'OTRO';
-  const tok = m[1].toUpperCase();
-  if (tok === 'PIP' || tok === 'PIPELINE' || tok === 'PRT') return 'PIPELINE';
-  if (tok === 'DESAL' || tok === 'DSL') return 'DESAL';
-  if (tok === 'PLNT' || tok === 'PLANT' || tok === 'PLANTA') return 'PLANTA';
-  return 'OTRO';
+export function deriveArea(descripcion: string, ubicacion: string, grupoDueno: string): Area {
+  const desc = descripcion ?? '';
+  const ubi = (ubicacion ?? '').trim();
+  const grupo = (grupoDueno ?? '').trim().toUpperCase();
+
+  if (grupo.startsWith('PL') || PIP_TOKEN.test(desc)) return 'Pipeline';
+  if (PUERTO_TAGS.test(ubi)) return 'Puerto';
+  if (DESALADORA_TAGS.test(ubi)) return 'Desaladora';
+  return 'Otros';
 }
 
 type DiscRule =

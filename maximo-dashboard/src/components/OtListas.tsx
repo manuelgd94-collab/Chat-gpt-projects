@@ -69,6 +69,7 @@ function OtTabla({
                 <th className="py-1 pr-2">OT</th>
                 <th className="py-1 pr-2">Descripción</th>
                 <th className="py-1 pr-2">Disciplina</th>
+                <th className="py-1 pr-2">Grupo</th>
                 <th className="py-1 pr-2">Programado</th>
                 <th className="py-1 pr-2">Estado</th>
               </tr>
@@ -84,6 +85,7 @@ function OtTabla({
                     </div>
                   </td>
                   <td className="py-1 pr-2">{r.disciplina}</td>
+                  <td className="py-1 pr-2 font-mono text-[11px]">{r.grupoDueno || '—'}</td>
                   <td className="py-1 pr-2 whitespace-nowrap">{fmtDateShort(r.inicioProgramado)}</td>
                   <td className="py-1 pr-2 whitespace-nowrap">
                     <EstadoBadge estado={r.estado} />

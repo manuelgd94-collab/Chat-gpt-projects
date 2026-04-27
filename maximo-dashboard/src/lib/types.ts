@@ -19,7 +19,7 @@ export interface WorkOrder {
   completada: boolean;
 }
 
-export type Area = 'PIPELINE' | 'PLANTA' | 'DESAL' | 'OTRO';
+export type Area = 'Pipeline' | 'Puerto' | 'Desaladora' | 'Otros';
 
 export interface Filters {
   semana: string | 'TODAS';

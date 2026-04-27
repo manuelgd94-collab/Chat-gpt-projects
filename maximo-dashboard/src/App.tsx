@@ -10,6 +10,7 @@ import { WeekManager } from './components/WeekManager';
 import { OtListas } from './components/OtListas';
 import { DisciplinaPills } from './components/DisciplinaPills';
 import { DisciplinaSummary } from './components/DisciplinaSummary';
+import { CodigosSinClasificar } from './components/CodigosSinClasificar';
 import {
   applyFilters,
   areaSummary,
@@ -160,6 +161,8 @@ export default function App() {
             </section>
 
             <AreaSummary rows={areas} />
+
+            <CodigosSinClasificar rows={filteredExceptDisciplina} />
 
             <OtListas rows={filtered} />
 
