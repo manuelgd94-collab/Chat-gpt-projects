@@ -264,7 +264,7 @@ export async function parseWorkbook(file: File): Promise<ParseResult> {
       planta: String(r[map.planta] ?? '').trim(),
 
       semana: deriveSemana(descripcion, inicioProgramado ?? inicioPrevisto),
-      area: deriveArea(descripcion, ubicacion),
+      area: deriveArea(descripcion, ubicacion, grupoDueno),
       disciplina: deriveDisciplina(grupoDueno),
       completada: isCompletada(estado),
     };

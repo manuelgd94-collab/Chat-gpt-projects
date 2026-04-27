@@ -1,4 +1,5 @@
 import type { WorkOrder } from './types';
+import { deriveArea, deriveDisciplina, deriveSemana, isCompletada } from './derive';
 
 const DB_NAME = 'maximo-dashboard';
 const DB_VERSION = 1;
@@ -91,7 +92,16 @@ export async function getWeekOrders(weekId: string): Promise<WorkOrder[]> {
   const t = tx(db, [STORE_ORDERS], 'readonly');
   const idx = t.objectStore(STORE_ORDERS).index('byWeek');
   const all = await reqAsync(idx.getAll(weekId));
-  return (all as StoredOrder[]).map(stripStoredFields);
+  return (all as StoredOrder[]).map((s) => {
+    const base = stripStoredFields(s);
+    return {
+      ...base,
+      area: deriveArea(base.descripcion, base.ubicacion, base.grupoDueno),
+      disciplina: deriveDisciplina(base.grupoDueno),
+      semana: deriveSemana(base.descripcion, base.inicioProgramado ?? base.inicioPrevisto),
+      completada: isCompletada(base.estado),
+    };
+  });
 }
 
 function stripStoredFields(s: StoredOrder): WorkOrder {
