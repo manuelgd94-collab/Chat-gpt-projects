@@ -1,13 +1,19 @@
-import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarChart, CartesianGrid, Legend, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { NPBucket } from '../lib/kpi';
+import { CopyCsvButton } from './CopyCsvButton';
+import { TODAY_LINE_COLOR, todayLabel } from '../lib/colors';
 
 interface Props {
   data: NPBucket[];
+  onSelectDia?: (diaIso: string) => void;
 }
 
-export function NPSeguimiento({ data }: Props) {
+export function NPSeguimiento({ data, onSelectDia }: Props) {
   const totalPlan = data.reduce((s, b) => s + b.plan, 0);
   const totalReal = data.reduce((s, b) => s + b.real, 0);
+  const today = todayLabel();
+  const hasToday = data.some((d) => d.label === today);
+  const csvRows = data.map((d) => [d.dia, d.label, d.plan, d.real]);
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
       <div className="flex items-center justify-between mb-2">
@@ -17,14 +23,17 @@ export function NPSeguimiento({ data }: Props) {
             OTs no planeadas/urgentes con Inicio programado dentro de la semana en curso.
           </div>
         </div>
-        <div className="text-right text-xs">
-          <div className="text-slate-500 dark:text-slate-400">Semana</div>
-          <div className="font-semibold">
-            {totalReal}/{totalPlan}{' '}
-            <span className="text-slate-500">
-              ({totalPlan > 0 ? Math.round((totalReal / totalPlan) * 100) : 0}%)
-            </span>
+        <div className="flex items-center gap-2">
+          <div className="text-right text-xs">
+            <div className="text-slate-500 dark:text-slate-400">Semana</div>
+            <div className="font-semibold">
+              {totalReal}/{totalPlan}{' '}
+              <span className="text-slate-500">
+                ({totalPlan > 0 ? Math.round((totalReal / totalPlan) * 100) : 0}%)
+              </span>
+            </div>
           </div>
+          <CopyCsvButton headers={['fecha', 'dia', 'plan', 'real']} rows={csvRows} />
         </div>
       </div>
       {data.length === 0 ? (
@@ -40,8 +49,23 @@ export function NPSeguimiento({ data }: Props) {
               <YAxis allowDecimals={false} tick={{ fontSize: 12 }} />
               <Tooltip />
               <Legend />
-              <Bar dataKey="plan" name="Programadas NP" fill="#f97316" />
-              <Bar dataKey="real" name="Ejecutadas NP" fill="#16a34a" />
+              {hasToday && (
+                <ReferenceLine x={today} stroke={TODAY_LINE_COLOR} strokeDasharray="3 3" label={{ value: 'hoy', fill: TODAY_LINE_COLOR, fontSize: 11, position: 'top' }} />
+              )}
+              <Bar
+                dataKey="plan"
+                name="Programadas NP"
+                fill="#f97316"
+                cursor={onSelectDia ? 'pointer' : undefined}
+                onClick={(d: { dia?: string }) => d?.dia && onSelectDia?.(d.dia)}
+              />
+              <Bar
+                dataKey="real"
+                name="Ejecutadas NP"
+                fill="#16a34a"
+                cursor={onSelectDia ? 'pointer' : undefined}
+                onClick={(d: { dia?: string }) => d?.dia && onSelectDia?.(d.dia)}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>

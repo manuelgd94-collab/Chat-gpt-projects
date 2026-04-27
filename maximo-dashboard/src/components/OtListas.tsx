@@ -1,4 +1,5 @@
 import type { WorkOrder } from '../lib/types';
+import { CopyCsvButton } from './CopyCsvButton';
 
 interface Props {
   rows: WorkOrder[];
@@ -50,6 +51,17 @@ function OtTabla({
       ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-900 dark:text-amber-200'
       : 'bg-red-100 dark:bg-red-900/40 text-red-900 dark:text-red-200';
 
+  const csvRows = sorted.map((r) => [
+    r.orden,
+    r.descripcion,
+    r.ubicacion,
+    r.area,
+    r.disciplina,
+    r.grupoDueno,
+    r.inicioProgramado ? r.inicioProgramado : '',
+    r.estado,
+  ]);
+
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
       <div className="flex items-center justify-between mb-2">
@@ -57,7 +69,13 @@ function OtTabla({
           <div className="text-sm font-semibold">{titulo}</div>
           <div className="text-xs text-slate-500 dark:text-slate-400">{descripcion}</div>
         </div>
-        <span className={`text-xs px-2 py-1 rounded-full font-semibold ${accentClass}`}>{rows.length}</span>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs px-2 py-1 rounded-full font-semibold ${accentClass}`}>{rows.length}</span>
+          <CopyCsvButton
+            headers={['OT', 'Descripción', 'Ubicación', 'Área', 'Disciplina', 'Grupo', 'Programado', 'Estado']}
+            rows={csvRows}
+          />
+        </div>
       </div>
       {sorted.length === 0 ? (
         <div className="text-sm text-slate-500 py-4 text-center">Sin OTs en estos estados.</div>
@@ -75,8 +93,14 @@ function OtTabla({
               </tr>
             </thead>
             <tbody>
-              {sorted.map((r) => (
-                <tr key={r.orden} className="border-b border-slate-100 dark:border-slate-800/50 align-top">
+              {sorted.map((r, i) => (
+                <tr
+                  key={r.orden}
+                  className={[
+                    'border-b border-slate-100 dark:border-slate-800/50 align-top',
+                    i % 2 ? 'bg-slate-50/50 dark:bg-slate-800/20' : '',
+                  ].join(' ')}
+                >
                   <td className="py-1 pr-2 font-mono">{r.orden}</td>
                   <td className="py-1 pr-2 max-w-[280px]" title={r.descripcion}>
                     <div className="truncate">{r.descripcion}</div>

@@ -1,4 +1,5 @@
 import type { WorkOrder } from '../lib/types';
+import { colorFor } from '../lib/colors';
 
 interface Props {
   rows: WorkOrder[];
@@ -18,7 +19,7 @@ export function DisciplinaPills({ rows, value, onChange }: Props) {
         Vista por especialidad
       </div>
       <div className="flex flex-wrap gap-2">
-        <Pill active={value === 'TODAS'} onClick={() => onChange('TODAS')} label="Todas" count={total} />
+        <Pill active={value === 'TODAS'} onClick={() => onChange('TODAS')} label="Todas" count={total} color={null} />
         {disciplinas.map((d) => (
           <Pill
             key={d}
@@ -26,6 +27,7 @@ export function DisciplinaPills({ rows, value, onChange }: Props) {
             onClick={() => onChange(d)}
             label={d}
             count={counts.get(d) ?? 0}
+            color={colorFor(d)}
           />
         ))}
       </div>
@@ -38,28 +40,42 @@ function Pill({
   onClick,
   label,
   count,
+  color,
 }: {
   active: boolean;
   onClick: () => void;
   label: string;
   count: number;
+  color: string | null;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      style={
+        active && color
+          ? { backgroundColor: color, borderColor: color, color: 'white' }
+          : color
+          ? { borderColor: color }
+          : undefined
+      }
       className={[
         'inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium transition border',
-        active
+        active && color
+          ? 'shadow-sm'
+          : active
           ? 'bg-sky-600 text-white border-sky-600 shadow-sm'
           : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-200 border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800',
       ].join(' ')}
     >
+      {color && !active && (
+        <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ backgroundColor: color }} />
+      )}
       <span>{label}</span>
       <span
         className={[
           'inline-flex items-center justify-center min-w-[1.5rem] h-5 px-1.5 rounded-full text-[11px] font-semibold',
-          active ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200',
+          active ? 'bg-white/25 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200',
         ].join(' ')}
       >
         {count}

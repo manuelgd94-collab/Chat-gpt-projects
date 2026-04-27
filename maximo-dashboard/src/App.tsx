@@ -163,11 +163,11 @@ export default function App() {
             </section>
 
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <PlanVsReal data={buckets} />
+              <PlanVsReal data={buckets} onSelectDia={setDiaObjetivo} />
               <CurvaS data={curva} />
             </section>
 
-            <NPSeguimiento data={npBuckets} />
+            <NPSeguimiento data={npBuckets} onSelectDia={setDiaObjetivo} />
 
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Matrix disciplinas={matrix.disciplinas} dias={matrix.dias} cells={matrix.cells} />
