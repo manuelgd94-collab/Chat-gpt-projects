@@ -95,9 +95,8 @@ export function prioridadNum(wo: { prioridad: string | number | null }): number 
   return isNaN(n) ? null : n;
 }
 
-export function isNP(wo: { prioridad: string | number | null }): boolean {
-  const n = prioridadNum(wo);
-  return n !== null && n >= 1 && n <= 3;
+export function isNP(wo: { addedAfterBase?: boolean }): boolean {
+  return wo.addedAfterBase === true;
 }
 
 export function derivePrograma(wo: { descripcion: string; ubicacion: string }): string {

@@ -23,10 +23,10 @@ export function KpisPlanificacion({ pm, backlogCount, npPlan, npReal }: Props) {
       hint: 'OTs programadas ≤ hoy aún no en 70-COMP',
     },
     {
-      label: 'NP semana (P1–P3)',
+      label: 'NP semana (no programadas)',
       value: `${npReal}/${npPlan}`,
       tone: tone(npRatio),
-      hint: `${pct(npRatio)} ejecutadas`,
+      hint: `OTs aparecidas en updates · ${pct(npRatio)} ejecutadas`,
     },
     {
       label: 'Mix PM / CM',

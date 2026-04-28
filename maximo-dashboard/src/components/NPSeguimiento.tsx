@@ -18,9 +18,10 @@ export function NPSeguimiento({ data, onSelectDia }: Props) {
     <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
       <div className="flex items-center justify-between mb-2">
         <div>
-          <div className="text-sm font-semibold">Seguimiento diario NP (Prioridad 1–3)</div>
+          <div className="text-sm font-semibold">Seguimiento diario NP (No Programadas)</div>
           <div className="text-xs text-slate-500 dark:text-slate-400">
-            OTs no planeadas/urgentes con Inicio programado dentro de la semana en curso.
+            OTs que aparecen en actualizaciones diarias y no estaban en el archivo base
+            (programa) de la semana — break-in / urgencias.
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -38,7 +39,7 @@ export function NPSeguimiento({ data, onSelectDia }: Props) {
       </div>
       {data.length === 0 ? (
         <div className="text-sm text-slate-500 py-8 text-center">
-          Sin OTs de prioridad 1–3 con fecha programada en la semana actual.
+          Sin NPs en la semana — todas las OTs estaban en el archivo base.
         </div>
       ) : (
         <div className="h-64">

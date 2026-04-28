@@ -17,6 +17,7 @@ export interface WorkOrder {
   area: Area;
   disciplina: string;
   completada: boolean;
+  addedAfterBase?: boolean;
 }
 
 export type Area = 'Pipeline' | 'Puerto' | 'Desaladora' | 'Otros';
