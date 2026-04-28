@@ -100,6 +100,7 @@ export async function getWeekOrders(weekId: string): Promise<WorkOrder[]> {
       disciplina: deriveDisciplina(base.grupoDueno),
       semana: deriveSemana(base.descripcion, base.inicioProgramado ?? base.inicioPrevisto),
       completada: isCompletada(base.estado),
+      addedAfterBase: s.addedAfterBase === true,
     };
   });
 }
@@ -140,6 +141,7 @@ export async function saveBase(
     const stored: StoredOrder = {
       ...r,
       weekId,
+      addedAfterBase: false,
       estadoBase: r.estado,
       estadoUpdates: [{ ts, estado: r.estado }],
     };
@@ -219,6 +221,7 @@ export async function applyDaily(
       const stored: StoredOrder = {
         ...r,
         weekId,
+        addedAfterBase: true,
         estadoBase: r.estado,
         estadoUpdates: [{ ts, estado: r.estado }],
       };
