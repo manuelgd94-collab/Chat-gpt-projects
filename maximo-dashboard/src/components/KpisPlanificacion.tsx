@@ -3,11 +3,12 @@ import type { PmComplianceResult } from '../lib/kpi';
 interface Props {
   pm: PmComplianceResult;
   backlogCount: number;
+  backlogEdadDias: number;
   npPlan: number;
   npReal: number;
 }
 
-export function KpisPlanificacion({ pm, backlogCount, npPlan, npReal }: Props) {
+export function KpisPlanificacion({ pm, backlogCount, backlogEdadDias, npPlan, npReal }: Props) {
   const npRatio = npPlan > 0 ? npReal / npPlan : 0;
   const cards = [
     {
@@ -20,7 +21,10 @@ export function KpisPlanificacion({ pm, backlogCount, npPlan, npReal }: Props) {
       label: 'Backlog (atrasadas)',
       value: String(backlogCount),
       tone: backlogCount === 0 ? ('ok' as const) : backlogCount <= 5 ? ('warn' as const) : ('bad' as const),
-      hint: 'OTs programadas ≤ hoy aún no en 70-COMP',
+      hint:
+        backlogCount === 0
+          ? 'OTs programadas ≤ hoy aún no en 70-COMP'
+          : `Edad promedio: ${backlogEdadDias.toFixed(1)} días`,
     },
     {
       label: 'NP semana (no programadas)',
