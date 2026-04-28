@@ -13,6 +13,7 @@ import { DisciplinaSummary } from './components/DisciplinaSummary';
 import { CodigosSinClasificar } from './components/CodigosSinClasificar';
 import { KpisPlanificacion } from './components/KpisPlanificacion';
 import { NPSeguimiento } from './components/NPSeguimiento';
+import { DistribucionPrioridad } from './components/DistribucionPrioridad';
 import {
   applyFilters,
   areaSummary,
@@ -22,9 +23,11 @@ import {
   curvaS,
   defaultTargetDate,
   disciplinaSummary,
+  edadBacklogPromedio,
   matrixDisciplinaDia,
   npDailyBuckets,
   pmCompliance,
+  prioridadBuckets,
 } from './lib/kpi';
 import { getWeekOrders, listWeeks, type WeekMeta } from './lib/db';
 import type { Filters, WorkOrder } from './lib/types';
@@ -87,9 +90,11 @@ export default function App() {
   const discSummary = useMemo(() => disciplinaSummary(filteredExceptDisciplina), [filteredExceptDisciplina]);
   const pm = useMemo(() => pmCompliance(filtered), [filtered]);
   const backlog = useMemo(() => backlogSemanal(filtered), [filtered]);
+  const backlogEdad = useMemo(() => edadBacklogPromedio(filtered), [filtered]);
   const npBuckets = useMemo(() => npDailyBuckets(filtered), [filtered]);
   const npPlan = useMemo(() => npBuckets.reduce((s, b) => s + b.plan, 0), [npBuckets]);
   const npReal = useMemo(() => npBuckets.reduce((s, b) => s + b.real, 0), [npBuckets]);
+  const prioridades = useMemo(() => prioridadBuckets(filtered), [filtered]);
 
   useEffect(() => {
     if (rows.length === 0) return;
@@ -157,6 +162,7 @@ export default function App() {
               <KpisPlanificacion
                 pm={pm}
                 backlogCount={backlog.length}
+                backlogEdadDias={backlogEdad}
                 npPlan={npPlan}
                 npReal={npReal}
               />
@@ -167,7 +173,10 @@ export default function App() {
               <CurvaS data={curva} />
             </section>
 
-            <NPSeguimiento data={npBuckets} onSelectDia={setDiaObjetivo} />
+            <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <NPSeguimiento data={npBuckets} onSelectDia={setDiaObjetivo} />
+              <DistribucionPrioridad data={prioridades} />
+            </section>
 
             <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <Matrix disciplinas={matrix.disciplinas} dias={matrix.dias} cells={matrix.cells} />

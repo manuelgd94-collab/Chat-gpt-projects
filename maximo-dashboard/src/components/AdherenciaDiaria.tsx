@@ -1,7 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import type { WorkOrder } from '../lib/types';
 import { ESTADOS_PIVOT, adherenciaDiariaPivot, uniqueProgramadosDates } from '../lib/kpi';
 import { CopyCsvButton } from './CopyCsvButton';
+import { ExportPngButton } from './ExportPngButton';
 import { fmtPct } from '../lib/format';
 
 interface Props {
@@ -14,6 +15,7 @@ export function AdherenciaDiaria({ rows, fecha, onChangeFecha }: Props) {
   const pivot = useMemo(() => adherenciaDiariaPivot(rows, fecha), [rows, fecha]);
   const fechasDisponibles = useMemo(() => uniqueProgramadosDates(rows), [rows]);
   const headerLabel = useMemo(() => formatFechaLarga(fecha), [fecha]);
+  const tableRef = useRef<HTMLDivElement | null>(null);
 
   return (
     <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4">
@@ -45,10 +47,11 @@ export function AdherenciaDiaria({ rows, fecha, onChangeFecha }: Props) {
               [pivot.totalRow.disciplina, ...ESTADOS_PIVOT.map((e) => pivot.totalRow.counts[e]), pivot.totalRow.total, fmtPct(pivot.totalRow.adherencia, 0)],
             ]}
           />
+          <ExportPngButton targetRef={tableRef} fileName={`adherencia-diaria-${fecha}.png`} />
         </div>
       </div>
 
-      <div className="overflow-x-auto">
+      <div className="overflow-x-auto" ref={tableRef}>
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr>

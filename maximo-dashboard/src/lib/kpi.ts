@@ -1,5 +1,5 @@
 import type { DayBucket, Filters, KpiSummary, MatrixCell, WorkOrder } from './types';
-import { dayKey, dayLabel, derivePrograma, isNP, sameDay, tipoMantenimiento } from './derive';
+import { dayKey, dayLabel, derivePrograma, isNP, prioridadNum, sameDay, tipoMantenimiento } from './derive';
 
 export function applyFilters(rows: WorkOrder[], f: Filters): WorkOrder[] {
   return rows.filter((r) => {
@@ -348,6 +348,52 @@ export function npDailyBuckets(rows: WorkOrder[]): NPBucket[] {
   return Array.from(map.entries())
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([dia, v]) => ({ dia, label: dayLabel(dia), plan: v.plan, real: v.real }));
+}
+
+export interface PrioridadBucket {
+  prioridad: number | 'Sin prioridad';
+  label: string;
+  plan: number;
+  real: number;
+  ratio: number;
+}
+
+export function prioridadBuckets(rows: WorkOrder[]): PrioridadBucket[] {
+  const map = new Map<number | 'Sin prioridad', { plan: number; real: number }>();
+  for (const r of rows) {
+    if (r.inicioProgramado == null) continue;
+    const p = prioridadNum(r);
+    const key = p == null ? 'Sin prioridad' : p;
+    const b = map.get(key) ?? { plan: 0, real: 0 };
+    b.plan++;
+    if (r.completada) b.real++;
+    map.set(key, b);
+  }
+  return Array.from(map.entries())
+    .map(([prioridad, v]) => ({
+      prioridad,
+      label: prioridad === 'Sin prioridad' ? 'Sin prioridad' : `P${prioridad}`,
+      plan: v.plan,
+      real: v.real,
+      ratio: v.plan > 0 ? v.real / v.plan : 0,
+    }))
+    .sort((a, b) => {
+      if (a.prioridad === 'Sin prioridad') return 1;
+      if (b.prioridad === 'Sin prioridad') return -1;
+      return (a.prioridad as number) - (b.prioridad as number);
+    });
+}
+
+export function edadBacklogPromedio(rows: WorkOrder[], hoy: Date = new Date()): number {
+  const backlog = backlogSemanal(rows, hoy);
+  if (backlog.length === 0) return 0;
+  const today = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  const totalDias = backlog.reduce((s, r) => {
+    if (!r.inicioProgramado) return s;
+    const ms = today.getTime() - new Date(r.inicioProgramado.getFullYear(), r.inicioProgramado.getMonth(), r.inicioProgramado.getDate()).getTime();
+    return s + Math.max(0, Math.floor(ms / 86400000));
+  }, 0);
+  return totalDias / backlog.length;
 }
 
 export function uniqueProgramadosDates(rows: WorkOrder[]): string[] {
