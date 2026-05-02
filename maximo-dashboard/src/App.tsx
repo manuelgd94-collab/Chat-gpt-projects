@@ -14,17 +14,22 @@ import { CodigosSinClasificar } from './components/CodigosSinClasificar';
 import { KpisPlanificacion } from './components/KpisPlanificacion';
 import { NPSeguimiento } from './components/NPSeguimiento';
 import { DistribucionPrioridad } from './components/DistribucionPrioridad';
+import { TablaDiaria } from './components/TablaDiaria';
+import { Tabs, type Tab } from './components/Tabs';
+import { NoProgramadasTab } from './components/tabs/NoProgramadasTab';
+import { ListadoCompletoTab } from './components/tabs/ListadoCompletoTab';
 import {
   applyFilters,
   areaSummary,
+  atrasadasHoy,
   backlogSemanal,
   bucketByDay,
-  computeKpis,
   curvaS,
   defaultTargetDate,
   disciplinaSummary,
   edadBacklogPromedio,
   matrixDisciplinaDia,
+  noProgramadasFinalizadas,
   npDailyBuckets,
   pmCompliance,
   prioridadBuckets,
@@ -40,6 +45,9 @@ const DEFAULT_FILTERS: Filters = {
 };
 
 const ACTIVE_WEEK_KEY = 'maximo-dashboard:activeWeek';
+
+const ATRASADAS_RE = /^(55|60)/;
+const INCUMPLIMIENTO_RE = /^(32|40|50|90)/;
 
 export default function App() {
   const [weeks, setWeeks] = useState<WeekMeta[]>([]);
@@ -82,7 +90,12 @@ export default function App() {
     () => applyFilters(rows, { ...filters, disciplina: 'TODAS' }),
     [rows, filters],
   );
-  const kpi = useMemo(() => computeKpis(filtered), [filtered]);
+
+  const programadas = useMemo(() => filtered.filter((r) => r.inicioProgramado != null), [filtered]);
+  const cerradas = useMemo(() => programadas.filter((r) => r.completada), [programadas]);
+  const atrasadas = useMemo(() => atrasadasHoy(filtered), [filtered]);
+  const cumplimiento = programadas.length > 0 ? cerradas.length / programadas.length : 0;
+
   const buckets = useMemo(() => bucketByDay(filtered), [filtered]);
   const curva = useMemo(() => curvaS(buckets), [buckets]);
   const matrix = useMemo(() => matrixDisciplinaDia(filtered), [filtered]);
@@ -95,6 +108,12 @@ export default function App() {
   const npPlan = useMemo(() => npBuckets.reduce((s, b) => s + b.plan, 0), [npBuckets]);
   const npReal = useMemo(() => npBuckets.reduce((s, b) => s + b.real, 0), [npBuckets]);
   const prioridades = useMemo(() => prioridadBuckets(filtered), [filtered]);
+  const noProgFinal = useMemo(() => noProgramadasFinalizadas(filtered), [filtered]);
+  const otsAtrasadasList = useMemo(() => filtered.filter((r) => ATRASADAS_RE.test(r.estado.trim())), [filtered]);
+  const otsIncumplimientoList = useMemo(
+    () => filtered.filter((r) => INCUMPLIMIENTO_RE.test(r.estado.trim())),
+    [filtered],
+  );
 
   useEffect(() => {
     if (rows.length === 0) return;
@@ -113,18 +132,114 @@ export default function App() {
   const activeWeek = weeks.find((w) => w.weekId === activeWeekId) ?? null;
   const hasData = rows.length > 0;
 
+  const tabs: Tab[] = [
+    {
+      id: 'resumen',
+      label: 'Resumen diario',
+      content: (
+        <div className="space-y-6">
+          <KpiCards
+            data={{
+              programadas: programadas.length,
+              cerradas: cerradas.length,
+              pendientes: programadas.length - cerradas.length,
+              atrasadas: atrasadas.length,
+              cumplimiento,
+            }}
+          />
+          <KpisPlanificacion
+            pm={pm}
+            backlogCount={backlog.length}
+            backlogEdadDias={backlogEdad}
+            npPlan={npPlan}
+            npReal={npReal}
+          />
+          <TablaDiaria rows={filtered} />
+          <AdherenciaDiaria rows={rows} fecha={diaObjetivo} onChangeFecha={setDiaObjetivo} />
+          <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <PlanVsReal data={buckets} onSelectDia={setDiaObjetivo} />
+            <CurvaS data={curva} />
+          </section>
+          <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <NPSeguimiento data={npBuckets} onSelectDia={setDiaObjetivo} />
+            <DistribucionPrioridad data={prioridades} />
+          </section>
+        </div>
+      ),
+    },
+    {
+      id: 'especialidad',
+      label: 'Adherencia por especialidad',
+      content: (
+        <div className="space-y-6">
+          <DisciplinaPills
+            rows={filteredExceptDisciplina}
+            value={filters.disciplina}
+            onChange={(d) => setFilters({ ...filters, disciplina: d })}
+          />
+          <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <Matrix disciplinas={matrix.disciplinas} dias={matrix.dias} cells={matrix.cells} />
+            <DisciplinaSummary
+              rows={discSummary}
+              activeDisciplina={filters.disciplina}
+              onSelectDisciplina={(d) => setFilters({ ...filters, disciplina: d })}
+            />
+          </section>
+          <AreaSummary rows={areas} />
+          <CodigosSinClasificar rows={filteredExceptDisciplina} />
+        </div>
+      ),
+    },
+    {
+      id: 'atrasadas',
+      label: 'OTs Atrasadas',
+      badge: otsAtrasadasList.length,
+      badgeTone: 'amber',
+      content: (
+        <OtListas
+          rows={filtered}
+          show="atrasadas"
+        />
+      ),
+    },
+    {
+      id: 'incumplimiento',
+      label: 'OTs Incumplimiento',
+      badge: otsIncumplimientoList.length,
+      badgeTone: 'red',
+      content: (
+        <OtListas
+          rows={filtered}
+          show="incumplimiento"
+        />
+      ),
+    },
+    {
+      id: 'noprog',
+      label: 'No Programadas',
+      badge: noProgFinal.length,
+      content: <NoProgramadasTab rows={filtered} />,
+    },
+    {
+      id: 'listado',
+      label: 'Listado completo',
+      badge: filtered.length,
+      content: <ListadoCompletoTab rows={filtered} />,
+    },
+  ];
+
   return (
     <div className="min-h-screen">
-      <header className="border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+      <header className="border-b border-slate-200 bg-white">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold">Dashboard Maximo — Cumplimiento semanal</h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
+            <p className="text-xs text-slate-500">
               Client-side · IndexedDB local · Puerto Pipeline · turno 7×7
             </p>
           </div>
           {activeWeek && (
-            <div className="text-right text-xs text-slate-500 dark:text-slate-400">
+            <div className="text-right text-xs text-slate-500">
               <div className="font-medium">Semana activa: {activeWeek.weekId}</div>
               <div>{rows.length} OTs · {activeWeek.updatedDays.length} días actualizados</div>
             </div>
@@ -143,65 +258,19 @@ export default function App() {
         {!activeWeek ? (
           <EmptyState />
         ) : !hasData ? (
-          <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 text-sm text-slate-500">
+          <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
             Cargando OTs de {activeWeek.weekId}…
           </div>
         ) : (
           <>
-            <AdherenciaDiaria rows={rows} fecha={diaObjetivo} onChangeFecha={setDiaObjetivo} />
-
-            <DisciplinaPills
-              rows={filteredExceptDisciplina}
-              value={filters.disciplina}
-              onChange={(d) => setFilters({ ...filters, disciplina: d })}
-            />
-
-            <section className="flex flex-col gap-4">
-              <FiltersBar rows={rows} value={filters} onChange={setFilters} />
-              <KpiCards kpi={kpi} />
-              <KpisPlanificacion
-                pm={pm}
-                backlogCount={backlog.length}
-                backlogEdadDias={backlogEdad}
-                npPlan={npPlan}
-                npReal={npReal}
-              />
-            </section>
-
-            <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <PlanVsReal data={buckets} onSelectDia={setDiaObjetivo} />
-              <CurvaS data={curva} />
-            </section>
-
-            <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <NPSeguimiento data={npBuckets} onSelectDia={setDiaObjetivo} />
-              <DistribucionPrioridad data={prioridades} />
-            </section>
-
-            <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <Matrix disciplinas={matrix.disciplinas} dias={matrix.dias} cells={matrix.cells} />
-              <DisciplinaSummary
-                rows={discSummary}
-                activeDisciplina={filters.disciplina}
-                onSelectDisciplina={(d) => setFilters({ ...filters, disciplina: d })}
-              />
-            </section>
-
-            <AreaSummary rows={areas} />
-
-            <CodigosSinClasificar rows={filteredExceptDisciplina} />
-
-            <OtListas rows={filtered} />
-
-            <Limitations />
+            <FiltersBar rows={rows} value={filters} onChange={setFilters} />
+            <Tabs tabs={tabs} defaultTab="resumen" />
           </>
         )}
       </main>
 
-      <footer className="max-w-7xl mx-auto px-4 py-6 text-xs text-slate-500 dark:text-slate-400">
-        Construido con React · Vite · Tailwind · Recharts · SheetJS · IndexedDB. Estados Maximo:
-        {' '}
-        <code>32-WPCOND</code>, <code>55-SCH</code>, <code>60-INPRG</code>, <code>70-COMP</code>. Completada = estado empieza con <code>70</code>.
+      <footer className="max-w-7xl mx-auto px-4 py-6 text-xs text-slate-500">
+        Estados Maximo: <code>32-WPCOND</code> · <code>40-WMATL</code> · <code>50-WSCH</code> · <code>55-SCH</code> · <code>60-INPRG</code> · <code>70-COMP</code>. Cerrada = estado <code>70-COMP</code>. Umbrales: 🟢 ≥ 85% · 🟡 70-84% · 🔴 &lt; 70%.
       </footer>
     </div>
   );
@@ -209,40 +278,16 @@ export default function App() {
 
 function EmptyState() {
   return (
-    <div className="rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-10 text-center">
+    <div className="rounded-xl border-2 border-dashed border-slate-300 bg-white p-10 text-center">
       <div className="text-lg font-semibold">Aún no hay semanas cargadas</div>
-      <div className="mt-2 text-sm text-slate-500 dark:text-slate-400 max-w-2xl mx-auto">
+      <div className="mt-2 text-sm text-slate-500 max-w-2xl mx-auto">
         <p>Flujo recomendado:</p>
         <ol className="list-decimal text-left max-w-md mx-auto mt-2 space-y-1">
           <li>Pulsa <strong>📚 Cargar base semanal</strong> con el archivo de la nueva semana (ej. <code>Adherencia diaria SEM 16.xlsx</code>).</li>
-          <li>Cada día pulsa <strong>🔄 Actualizar con export diario</strong> con el export de Maximo (<code>NNNNNNNN.xls</code>) — sólo se actualizan los estados de las OTs ya registradas.</li>
+          <li>Cada día pulsa <strong>🔄 Actualizar con export diario</strong> con el export de Maximo (<code>NNNNNNNN.xls</code>).</li>
           <li>Al final de la semana, carga la siguiente base. Las semanas previas quedan guardadas y consultables.</li>
         </ol>
       </div>
     </div>
-  );
-}
-
-function Limitations() {
-  return (
-    <details className="rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4 text-sm">
-      <summary className="cursor-pointer font-semibold text-amber-800 dark:text-amber-300">
-        Limitaciones conocidas y supuestos
-      </summary>
-      <div className="mt-2 space-y-2 text-amber-900 dark:text-amber-200">
-        <p>
-          <strong>Adherencia Diaria:</strong> usa <code>OTs en 70-COMP / Total programadas del día</code>, replicando
-          el pivote manual mientras Maximo no exporte la fecha real de ejecución.
-        </p>
-        <p>
-          <strong>Adherencia (KPI global):</strong> compara <code>Inicio previsto</code> vs <code>Inicio programado</code>
-          {' '}sobre OTs completadas. Cuando exista fecha real, reemplazar en <code>src/lib/kpi.ts → computeKpis</code>.
-        </p>
-        <p>
-          <strong>Persistencia:</strong> los datos se guardan en IndexedDB del navegador (local, no se sincronizan).
-          Si cambias de equipo o limpias datos del sitio, hay que recargar las bases.
-        </p>
-      </div>
-    </details>
   );
 }

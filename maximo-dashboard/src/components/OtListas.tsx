@@ -3,14 +3,38 @@ import { CopyCsvButton } from './CopyCsvButton';
 
 interface Props {
   rows: WorkOrder[];
+  show?: 'atrasadas' | 'incumplimiento' | 'both';
 }
 
 const ATRASADAS_RE = /^(55|60)/;
 const INCUMPLIMIENTO_RE = /^(32|40|50|90)/;
 
-export function OtListas({ rows }: Props) {
+export function OtListas({ rows, show = 'both' }: Props) {
   const atrasadas = rows.filter((r) => ATRASADAS_RE.test(r.estado.trim()));
   const incumplimiento = rows.filter((r) => INCUMPLIMIENTO_RE.test(r.estado.trim()));
+
+  if (show === 'atrasadas') {
+    return (
+      <OtTabla
+        titulo="OTs atrasadas por cierre"
+        descripcion="Estados 55-SCH y 60-INPRG — programadas pero aún no completadas."
+        rows={atrasadas}
+        accent="amber"
+      />
+    );
+  }
+
+  if (show === 'incumplimiento') {
+    return (
+      <OtTabla
+        titulo="OTs en incumplimiento"
+        descripcion="Estados 32 (WPCOND), 40, 50 y 90 — en espera o canceladas."
+        rows={incumplimiento}
+        accent="red"
+      />
+    );
+  }
+
   return (
     <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       <OtTabla
