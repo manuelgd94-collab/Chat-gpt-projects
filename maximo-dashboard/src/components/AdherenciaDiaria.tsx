@@ -51,7 +51,7 @@ export function AdherenciaDiaria({ rows, fecha, onChangeFecha }: Props) {
         </div>
       </div>
 
-      <div className="overflow-x-auto" ref={tableRef}>
+      <div className="overflow-x-auto bg-white p-2" ref={tableRef}>
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr>
