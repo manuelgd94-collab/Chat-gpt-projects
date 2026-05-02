@@ -18,7 +18,7 @@ export function ExportPngButton({ targetRef, fileName, label = 'Exportar PNG' }:
       const dataUrl = await toPng(targetRef.current, {
         cacheBust: true,
         pixelRatio: 2,
-        backgroundColor: getComputedStyle(targetRef.current).backgroundColor || '#ffffff',
+        backgroundColor: '#ffffff',
       });
       const a = document.createElement('a');
       a.href = dataUrl;
