@@ -1,70 +1,58 @@
-import type { KpiSummary } from '../lib/types';
-import { fmtInt } from '../lib/format';
+import { fmtInt, fmtPct } from '../lib/format';
+import { tone, toneText } from '../lib/thresholds';
 
-interface Props {
-  kpi: KpiSummary;
+export interface KpiCardsData {
+  programadas: number;
+  cerradas: number;
+  pendientes: number;
+  atrasadas: number;
+  cumplimiento: number;
 }
 
-export function KpiCards({ kpi }: Props) {
+export function KpiCards({ data }: { data: KpiCardsData }) {
+  const cumplTone = tone(data.cumplimiento);
   const cards = [
     {
+      label: 'OTs programadas',
+      value: fmtInt(data.programadas),
+      hint: 'Total con Inicio programado en el período',
+      cls: 'text-slate-900',
+    },
+    {
+      label: 'OTs cerradas',
+      value: fmtInt(data.cerradas),
+      hint: 'Estado 70-COMP',
+      cls: 'text-emerald-700',
+    },
+    {
+      label: 'OTs pendientes',
+      value: fmtInt(data.pendientes),
+      hint: 'Programadas no cerradas',
+      cls: data.pendientes === 0 ? 'text-emerald-700' : 'text-slate-900',
+    },
+    {
+      label: 'OTs atrasadas',
+      value: fmtInt(data.atrasadas),
+      hint: 'Programado < hoy y estado ≠ 70-COMP',
+      cls: data.atrasadas === 0 ? 'text-emerald-700' : data.atrasadas <= 5 ? 'text-amber-700' : 'text-red-700',
+    },
+    {
       label: '% Cumplimiento',
-      value: pct(kpi.cumplimiento),
-      tone: tone(kpi.cumplimiento),
-      hint: 'OT completadas / OT planificadas',
-    },
-    {
-      label: '% Adherencia',
-      value: pct(kpi.adherencia),
-      tone: tone(kpi.adherencia),
-      hint: 'OT completadas con previsto = programado',
-    },
-    { label: 'OT Plan', value: fmtInt(kpi.planCount), tone: 'neutral' as const },
-    { label: 'OT Real', value: fmtInt(kpi.realCount), tone: 'neutral' as const },
-    {
-      label: 'Desviación',
-      value: `${kpi.desviacion >= 0 ? '+' : ''}${fmtInt(kpi.desviacion)}`,
-      tone: kpi.desviacion >= 0 ? ('ok' as const) : ('bad' as const),
+      value: fmtPct(data.cumplimiento),
+      hint: 'Cerradas / Programadas',
+      cls: toneText(cumplTone),
     },
   ];
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
       {cards.map((c) => (
-        <div
-          key={c.label}
-          className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4"
-        >
-          <div className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400">
-            {c.label}
-          </div>
-          <div className={`mt-1 text-2xl font-semibold ${toneClass(c.tone)}`}>{c.value}</div>
-          {c.hint && <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">{c.hint}</div>}
+        <div key={c.label} className="rounded-xl border border-slate-200 bg-white p-4">
+          <div className="text-xs uppercase tracking-wide text-slate-500">{c.label}</div>
+          <div className={`mt-1 text-2xl font-semibold ${c.cls}`}>{c.value}</div>
+          {c.hint && <div className="mt-1 text-xs text-slate-500">{c.hint}</div>}
         </div>
       ))}
     </div>
   );
-}
-
-function pct(v: number): string {
-  return `${(v * 100).toFixed(1)}%`;
-}
-
-function tone(v: number): 'ok' | 'warn' | 'bad' {
-  if (v >= 0.9) return 'ok';
-  if (v >= 0.75) return 'warn';
-  return 'bad';
-}
-
-function toneClass(t: 'ok' | 'warn' | 'bad' | 'neutral'): string {
-  switch (t) {
-    case 'ok':
-      return 'text-emerald-600 dark:text-emerald-400';
-    case 'warn':
-      return 'text-amber-600 dark:text-amber-400';
-    case 'bad':
-      return 'text-red-600 dark:text-red-400';
-    default:
-      return 'text-slate-900 dark:text-slate-100';
-  }
 }

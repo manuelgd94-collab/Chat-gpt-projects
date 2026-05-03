@@ -327,6 +327,23 @@ export function backlogSemanal(rows: WorkOrder[], hoy: Date = new Date()): WorkO
   });
 }
 
+export function atrasadasHoy(rows: WorkOrder[], hoy: Date = new Date()): WorkOrder[] {
+  const startOfToday = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate());
+  return rows.filter((r) => {
+    if (r.completada) return false;
+    if (!r.inicioProgramado) return false;
+    return r.inicioProgramado.getTime() < startOfToday.getTime();
+  });
+}
+
+export function noProgramadasFinalizadas(rows: WorkOrder[]): WorkOrder[] {
+  return rows.filter((r) => r.inicioProgramado == null && r.completada);
+}
+
+export function noProgramadasAll(rows: WorkOrder[]): WorkOrder[] {
+  return rows.filter((r) => r.inicioProgramado == null);
+}
+
 export interface NPBucket {
   dia: string;
   label: string;
