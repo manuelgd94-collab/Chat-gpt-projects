@@ -78,6 +78,9 @@ let
     }),
 
     // ---- Tipos ----
+    // Maximo devuelve fechas en UTC (ej. "2026-05-31T03:45:00+00:00").
+    // Las tipamos como datetimezone para PRESERVAR el offset y luego
+    // convertimos a hora local de Chile (-4) al extraer DiaProgramado/DiaReal.
     tipada = Table.TransformColumnTypes(expandida, {
         {"wonum", type text},
         {"description", type text},
@@ -88,13 +91,13 @@ let
         {"wopriority", Int64.Type},
         {"istask", type logical},
         {"parent", type text},
-        {"schedstart", type datetime},
-        {"schedfinish", type datetime},
-        {"targstartdate", type datetime},
-        {"targcompdate", type datetime},
-        {"actstart", type datetime},
-        {"actfinish", type datetime},
-        {"reportdate", type datetime},
+        {"schedstart", type datetimezone},
+        {"schedfinish", type datetimezone},
+        {"targstartdate", type datetimezone},
+        {"targcompdate", type datetimezone},
+        {"actstart", type datetimezone},
+        {"actfinish", type datetimezone},
+        {"reportdate", type datetimezone},
         {"location", type text},
         {"assetnum", type text},
         {"persongroup", type text},
@@ -103,11 +106,22 @@ let
         {"actlabhrs", type number}
     }),
 
+    // Zona horaria operativa de Quebrada Blanca: UTC-4 (CLT).
+    // Si Chile entra en DST, ajustar a -3 o cambiar a DateTimeZone.ToLocal().
+    tzOffset = -4,
+    aChile = (dtz as nullable datetimezone) as nullable datetime =>
+        if dtz = null then null
+        else DateTime.From(DateTimeZone.SwitchZone(dtz, tzOffset)),
+
     // ---- Derivaciones (paridad con src/lib/derive.ts del dashboard web) ----
     conFechas = Table.AddColumn(tipada, "DiaProgramado",
-        each if [schedstart] = null then null else Date.From([schedstart]), type date),
+        each let local = aChile([schedstart]) in
+             if local = null then null else Date.From(local),
+        type date),
     conReal = Table.AddColumn(conFechas, "DiaReal",
-        each if [actstart] = null then null else Date.From([actstart]), type date),
+        each let local = aChile([actstart]) in
+             if local = null then null else Date.From(local),
+        type date),
 
     conCerrada = Table.AddColumn(conReal, "Cerrada",
         each let s = Text.Upper(Text.Trim([status] ?? "")) in
@@ -115,9 +129,9 @@ let
         type logical),
 
     conAtrasada = Table.AddColumn(conCerrada, "Atrasada",
-        each [schedstart] <> null
+        each [DiaProgramado] <> null
              and not [Cerrada]
-             and Date.From([schedstart]) < Date.From(DateTime.LocalNow()),
+             and [DiaProgramado] < Date.From(DateTimeZone.SwitchZone(DateTimeZone.LocalNow(), tzOffset)),
         type logical),
 
     // ---- Tipo de mantenimiento ----
