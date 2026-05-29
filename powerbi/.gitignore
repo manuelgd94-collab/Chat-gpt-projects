@@ -1,0 +1,7 @@
+# Archivos binarios de Power BI Desktop — se generan desde los .pq + .dax
+*.pbix
+*.pbit
+
+# Caches locales
+.cache/
+*.tmp

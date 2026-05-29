@@ -1,0 +1,195 @@
+// =========================================================================
+// Medidas DAX — Cumplimiento Maximo
+// =========================================================================
+// Copia cada medida tal cual a Power BI Desktop:
+//   Vista Modelo → FactOTs → Nueva medida.
+// Todas las medidas viven en la tabla FactOTs salvo las del grupo "Semáforo"
+// que pueden ir en una tabla separada [Mediciones].
+// =========================================================================
+
+// ---- 1. CONTEOS BASE -----------------------------------------------------
+
+[OTs totales] =
+COUNTROWS ( FactOTs )
+
+[OTs Programadas] =
+CALCULATE (
+    COUNTROWS ( FactOTs ),
+    NOT ISBLANK ( FactOTs[schedstart] )
+)
+
+[OTs Cerradas] =
+CALCULATE (
+    COUNTROWS ( FactOTs ),
+    FactOTs[Cerrada] = TRUE ()
+)
+
+[OTs Pendientes] =
+[OTs Programadas] - [OTs Cerradas]
+
+[OTs Atrasadas] =
+CALCULATE (
+    COUNTROWS ( FactOTs ),
+    FactOTs[Atrasada] = TRUE ()
+)
+
+// ---- 2. KPI PRINCIPALES --------------------------------------------------
+
+[% Cumplimiento] =
+DIVIDE ( [OTs Cerradas], [OTs Programadas] )
+
+[% Adherencia] =
+VAR Completadas =
+    FILTER ( FactOTs, FactOTs[Cerrada] = TRUE () && NOT ISBLANK ( FactOTs[actstart] ) )
+VAR Adherentes =
+    FILTER (
+        Completadas,
+        DATE ( YEAR ( FactOTs[actstart] ), MONTH ( FactOTs[actstart] ), DAY ( FactOTs[actstart] ) )
+            = DATE ( YEAR ( FactOTs[schedstart] ), MONTH ( FactOTs[schedstart] ), DAY ( FactOTs[schedstart] ) )
+    )
+RETURN
+    DIVIDE ( COUNTROWS ( Adherentes ), COUNTROWS ( Completadas ) )
+
+[Desviación] = [OTs Cerradas] - [OTs Programadas]
+
+// ---- 3. CURVA S ----------------------------------------------------------
+
+[Plan acumulado] =
+CALCULATE (
+    [OTs Programadas],
+    FILTER (
+        ALLSELECTED ( DimCalendario[Fecha] ),
+        DimCalendario[Fecha] <= MAX ( DimCalendario[Fecha] )
+    )
+)
+
+[Real acumulado] =
+CALCULATE (
+    [OTs Cerradas],
+    FILTER (
+        ALLSELECTED ( DimCalendario[Fecha] ),
+        DimCalendario[Fecha] <= MAX ( DimCalendario[Fecha] )
+    )
+)
+
+[Plan semanal total] =
+CALCULATE ( [OTs Programadas], ALLSELECTED ( DimCalendario[Fecha] ) )
+
+[% Curva S Plan] =
+DIVIDE ( [Plan acumulado], [Plan semanal total] )
+
+[% Curva S Real] =
+DIVIDE ( [Real acumulado], [Plan semanal total] )
+
+// ---- 4. PM COMPLIANCE ----------------------------------------------------
+
+[Plan PM] =
+CALCULATE (
+    [OTs Programadas],
+    FactOTs[TipoMantenimiento] = "Preventivo"
+)
+
+[Real PM] =
+CALCULATE (
+    [OTs Cerradas],
+    FactOTs[TipoMantenimiento] = "Preventivo"
+)
+
+[PM Compliance %] =
+DIVIDE ( [Real PM], [Plan PM] )
+
+[Plan CM] =
+CALCULATE (
+    [OTs Programadas],
+    FactOTs[TipoMantenimiento] = "Correctivo"
+)
+
+[Real CM] =
+CALCULATE (
+    [OTs Cerradas],
+    FactOTs[TipoMantenimiento] = "Correctivo"
+)
+
+[Ratio PM/CM] =
+DIVIDE ( [Plan PM], [Plan PM] + [Plan CM] )
+
+// ---- 5. BACKLOG ----------------------------------------------------------
+
+[Backlog] =
+CALCULATE (
+    COUNTROWS ( FactOTs ),
+    FactOTs[Cerrada] = FALSE (),
+    NOT ISBLANK ( FactOTs[schedstart] ),
+    FactOTs[schedstart] <= TODAY ()
+)
+
+[Edad backlog (días)] =
+VAR BL =
+    FILTER (
+        FactOTs,
+        FactOTs[Cerrada] = FALSE ()
+            && NOT ISBLANK ( FactOTs[schedstart] )
+            && FactOTs[schedstart] <= TODAY ()
+    )
+RETURN
+    AVERAGEX ( BL, DATEDIFF ( FactOTs[schedstart], TODAY (), DAY ) )
+
+// ---- 6. CATEGORÍAS OPERATIVAS (paridad con tabs del dashboard web) -------
+
+[OTs Atrasadas por cierre] =
+CALCULATE (
+    COUNTROWS ( FactOTs ),
+    FactOTs[CategoriaEstado] = "Atrasadas por cierre"
+)
+
+[OTs en Incumplimiento] =
+CALCULATE (
+    COUNTROWS ( FactOTs ),
+    FactOTs[CategoriaEstado] = "Incumplimiento"
+)
+
+[OTs No Programadas] =
+CALCULATE (
+    COUNTROWS ( FactOTs ),
+    ISBLANK ( FactOTs[schedstart] )
+)
+
+[OTs NP Finalizadas] =
+CALCULATE (
+    COUNTROWS ( FactOTs ),
+    ISBLANK ( FactOTs[schedstart] ),
+    FactOTs[Cerrada] = TRUE ()
+)
+
+// ---- 7. SEMÁFORO (umbrales 85% / 70%) ------------------------------------
+
+[Semáforo Cumplimiento] =
+SWITCH (
+    TRUE (),
+    [% Cumplimiento] >= 0.85, "🟢 Verde",
+    [% Cumplimiento] >= 0.70, "🟡 Amarillo",
+    "🔴 Rojo"
+)
+
+[Color Semáforo (hex)] =
+SWITCH (
+    TRUE (),
+    [% Cumplimiento] >= 0.85, "#16a34a",
+    [% Cumplimiento] >= 0.70, "#d97706",
+    "#dc2626"
+)
+
+// ---- 8. COLUMNA CALCULADA en FactOTs para DCS no listado -----------------
+// Si el persongroup contiene "DCS" pero no está en DimDisciplina, lo
+// clasificamos como DCS. Crear como COLUMNA en FactOTs (no medida).
+
+FactOTs[DisciplinaFinal] =
+VAR Lookup =
+    LOOKUPVALUE ( DimDisciplina[Disciplina], DimDisciplina[Grupo], FactOTs[persongroup] )
+RETURN
+    SWITCH (
+        TRUE (),
+        NOT ISBLANK ( Lookup ), Lookup,
+        SEARCH ( "DCS", FactOTs[persongroup], 1, 0 ) > 0, "DCS",
+        "Otros"
+    )
