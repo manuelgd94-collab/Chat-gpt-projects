@@ -12,9 +12,10 @@
 
 // === SiteID (Texto) ====================================================
 // Código del sitio Maximo para Puerto Pipeline.
-// PEDIR A IT EL CÓDIGO EXACTO. Ejemplo: "PUERTO" o "PPCH".
-"PUERTO" meta [
-    Description = "Site ID del programa Puerto Pipeline"
+// Confirmado: campo "Planta" en Maximo = SITEID. Verificado contra OT
+// 686291 (WR E&I PRT SXX_25) y la consulta "Area PipeLine puerto EAM".
+"QB" meta [
+    Description = "Site ID del programa Puerto Pipeline (Planta QB)"
 ]
 
 // === SemanaDesde (Fecha) ===============================================

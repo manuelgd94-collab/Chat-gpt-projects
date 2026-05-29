@@ -26,7 +26,7 @@ por uno:
 | Nombre | Tipo | Valor por defecto |
 |---|---|---|
 | `MaximoBaseUrl` | Texto | `https://teck.maximo.com/maximo/oslc/os/mxwo` |
-| `SiteID` | Texto | (tu site, ej. `PUERTO`) |
+| `SiteID` | Texto | `QB` (Planta Puerto Pipeline) |
 | `SemanaDesde` | Fecha | Lunes de tu semana actual |
 | `SemanaHasta` | Fecha | Domingo de tu semana actual |
 
