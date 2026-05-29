@@ -20,14 +20,17 @@ let
     desdeISO = DateTime.ToText(DateTime.From(SemanaDesde), [Format="yyyy-MM-ddT00:00:00-04:00"]),
     hastaISO = DateTime.ToText(DateTime.From(Date.AddDays(SemanaHasta, 1)), [Format="yyyy-MM-ddT00:00:00-04:00"]),
 
+    // Excluye actividades hijas (istask=1) — mantenemos solo OTs padre, que
+    // es como cuenta el dashboard web actual y el reporte semanal de planificación.
     oslcWhere =
         "siteid=""" & SiteID & """" &
+        " and istask=0" &
         " and schedstart>=""" & desdeISO & """" &
         " and schedstart<""" & hastaISO & """",
 
     oslcSelect = Text.Combine({
         "wonum","description","status","status_description",
-        "siteid","worktype","wopriority",
+        "siteid","worktype","wopriority","istask","parent",
         "schedstart","schedfinish",
         "targstartdate","targcompdate",
         "actstart","actfinish",
@@ -68,7 +71,7 @@ let
     tabla = Table.FromList(todos, Splitter.SplitByNothing(), {"Item"}, null, ExtraValues.Error),
     expandida = Table.ExpandRecordColumn(tabla, "Item", {
         "wonum","description","status","status_description",
-        "siteid","worktype","wopriority",
+        "siteid","worktype","wopriority","istask","parent",
         "schedstart","schedfinish","targstartdate","targcompdate",
         "actstart","actfinish","reportdate","location","assetnum",
         "persongroup","classstructureid","estdur","actlabhrs"
@@ -83,6 +86,8 @@ let
         {"siteid", type text},
         {"worktype", type text},
         {"wopriority", Int64.Type},
+        {"istask", type logical},
+        {"parent", type text},
         {"schedstart", type datetime},
         {"schedfinish", type datetime},
         {"targstartdate", type datetime},
