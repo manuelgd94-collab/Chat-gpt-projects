@@ -1,7 +1,24 @@
 # Análisis de datos del Kino de la Suerte
 
-Dos scripts para descargar el historial de sorteos del **Kino de la Suerte**
+Scripts para descargar el historial de sorteos del **Kino de la Suerte**
 (Lotería de Concepción, Chile) y generar un informe estadístico descriptivo.
+
+## Opción rápida: Google Colab
+
+`kino_colab.ipynb` trae todo en un solo notebook (scraper + análisis) listo
+para correr en [Google Colab](https://colab.research.google.com/), donde sí
+hay acceso a internet:
+
+1. Subí `kino_colab.ipynb` a Colab (Archivo → Subir notebook), o abrilo
+   directo desde GitHub una vez que el branch esté en el repo
+   (Archivo → Abrir notebook → GitHub → pegar la URL del repo).
+2. Ejecutá las celdas en orden. La sección **"Paso 1 — Probar en una fecha
+   conocida"** valida el scraper antes de lanzar la descarga completa.
+3. Los gráficos y tablas se muestran inline; al final hay celdas opcionales
+   para descargar el CSV y un .zip con el informe completo.
+
+Los scripts `kino_scraper.py` / `analisis_kino.py` de abajo tienen la misma
+lógica pero como CLI, para correr localmente en tu máquina.
 
 ## ⚠️ Antes de correrlos
 
