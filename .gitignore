@@ -1,0 +1,11 @@
+# Datos y salidas generadas por scripts/kino_scraper.py y scripts/analisis_kino.py
+data/kino/*.csv
+data/kino/*.fallidas.txt
+informe_kino.md
+charts_kino/
+debug/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
